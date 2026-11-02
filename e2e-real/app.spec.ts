@@ -139,12 +139,27 @@ test("Fill & Sign on the real backend: draw a signature, it is stored, place it,
 
   await place.click();
   await expect(page.getByText("Click on the page to place")).toBeVisible(); // armed
-  const target = page.locator('[data-page="0"]').first();
-  const tb = (await target.boundingBox())!;
-  await page.mouse.click(tb.x + tb.width / 2, tb.y + Math.min(tb.height / 2, 200));
+  // click on a page that is actually on screen (the viewer keeps its scroll position between tests)
+  const visibleSpot = () =>
+    page.evaluate(() => {
+      let best: { x: number; y: number; area: number } | null = null;
+      for (const el of Array.from(document.querySelectorAll("[data-page]"))) {
+        const r = el.getBoundingClientRect();
+        const w = Math.max(0, Math.min(r.right, innerWidth - 300) - Math.max(r.left, 260));
+        const h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 100));
+        if (w * h > (best?.area ?? 0)) {
+          best = { x: Math.max(r.left, 260) + w / 2, y: Math.max(r.top, 100) + Math.min(h / 2, 220), area: w * h };
+        }
+      }
+      return best;
+    });
+  const spot = (await visibleSpot())!;
+  expect(spot, "some page must be visible").not.toBeNull();
+  await page.mouse.click(spot.x, spot.y);
   await expect(page.getByText("1 item(s) placed.")).toBeVisible();
   await page.getByRole("button", { name: "Date", exact: true }).click();
-  await page.mouse.click(tb.x + 80, tb.y + 80);
+  const spot2 = (await visibleSpot())!;
+  await page.mouse.click(spot2.x - 40, spot2.y - 40);
   await expect(page.getByText("2 item(s) placed.")).toBeVisible();
   await shot("sign");
 
