@@ -3,6 +3,8 @@ import { PasswordDialog } from "./components/PasswordDialog";
 import { Organizer } from "./components/Organizer";
 import { pickPdfs } from "./lib/organize-api";
 import { useOrganizer } from "./organizerStore";
+import { SignPanel } from "./components/SignPanel";
+import { useSign } from "./signStore";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Viewer } from "./components/Viewer";
@@ -20,6 +22,7 @@ const basename = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export function App() {
   const v = useViewer();
   const org = useOrganizer();
+  const sign = useSign();
   const [libError, setLibError] = useState<string | null>(null);
   const [wrongPw, setWrongPw] = useState(false);
 
@@ -93,6 +96,13 @@ export function App() {
       const s = useViewer.getState();
       const mod = e.ctrlKey || e.metaKey;
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
+      if (useSign.getState().active && !typing) {
+        const sg = useSign.getState();
+        if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) sg.redo(); else sg.undo(); return; }
+        if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); sg.redo(); return; }
+        if (e.key === "Escape") { if (sg.armed) sg.setArmed(null); else sg.select(null); return; }
+        if ((e.key === "Delete" || e.key === "Backspace") && sg.selectedId) { e.preventDefault(); sg.deleteSelected(); return; }
+      }
       if (mod && e.key.toLowerCase() === "o") { e.preventDefault(); void openDialog(); }
       else if (mod && e.key.toLowerCase() === "f" && s.doc) { e.preventDefault(); s.setSidebar("search"); }
       else if (mod && e.key.toLowerCase() === "p" && s.doc) { e.preventDefault(); void print(); }
@@ -139,6 +149,7 @@ export function App() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <Viewer />
+          {sign.active && <SignPanel />}
         </div>
       ) : (
         <Welcome onOpenRecent={openFromRecent} />

@@ -2,6 +2,8 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { pageText, type SearchHit, type TextRun } from "../lib/api";
 import { useNear } from "../hooks/useNear";
 import { usePageImage } from "../hooks/usePageImage";
+import { useSign } from "../signStore";
+import { SignLayer } from "./SignLayer";
 
 interface Props {
   docId: number;
@@ -28,6 +30,7 @@ export const PageSlot = memo(function PageSlot({ docId, page, width, height, sca
   const renderScale = Math.round(scale * dpr * 100) / 100;
   const url = usePageImage(docId, page, renderScale, near);
   const [runs, setRuns] = useState<TextRun[] | null>(null);
+  const signing = useSign((s) => s.active);
 
   useEffect(() => {
     if (!near || runs) return;
@@ -71,7 +74,8 @@ export const PageSlot = memo(function PageSlot({ docId, page, width, height, sca
           />
         )),
       )}
-      <div className="absolute inset-0 overflow-hidden" lang="">
+      {signing && <SignLayer page={page} width={width} height={height} scale={scale} />}
+      <div className={`absolute inset-0 overflow-hidden ${signing ? "pointer-events-none" : ""}`} lang="">
         {spans.map(({ r, px, sx }, i) => (
           <span
             key={i}

@@ -8,6 +8,8 @@ pub mod build;
 pub mod fs_safety;
 pub mod inspect;
 pub mod load;
+pub mod sigimage;
+pub mod sign;
 pub mod split;
 pub mod model;
 

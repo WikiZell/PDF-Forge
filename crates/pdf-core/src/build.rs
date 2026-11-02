@@ -49,7 +49,7 @@ type Result<T> = std::result::Result<T, BuildError>;
 
 // ---------- small object helpers ----------
 
-fn deref<'a>(doc: &'a Document, mut o: &'a Object) -> Option<&'a Object> {
+pub(crate) fn deref<'a>(doc: &'a Document, mut o: &'a Object) -> Option<&'a Object> {
     for _ in 0..32 {
         match o {
             Object::Reference(id) => o = doc.objects.get(id)?,
@@ -59,7 +59,7 @@ fn deref<'a>(doc: &'a Document, mut o: &'a Object) -> Option<&'a Object> {
     None
 }
 
-fn dict<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Dictionary> {
+pub(crate) fn dict<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Dictionary> {
     match deref(doc, o)? {
         Object::Dictionary(d) => Some(d),
         Object::Stream(s) => Some(&s.dict),
@@ -67,25 +67,25 @@ fn dict<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Dictionary> {
     }
 }
 
-fn get<'a>(doc: &'a Document, d: &'a Dictionary, key: &[u8]) -> Option<&'a Object> {
+pub(crate) fn get<'a>(doc: &'a Document, d: &'a Dictionary, key: &[u8]) -> Option<&'a Object> {
     deref(doc, d.get(key).ok()?)
 }
 
-fn array<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Vec<Object>> {
+pub(crate) fn array<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Vec<Object>> {
     match deref(doc, o)? {
         Object::Array(a) => Some(a),
         _ => None,
     }
 }
 
-fn name_of(o: &Object) -> Option<&[u8]> {
+pub(crate) fn name_of(o: &Object) -> Option<&[u8]> {
     match o {
         Object::Name(n) => Some(n),
         _ => None,
     }
 }
 
-fn int(o: &Object) -> Option<i64> {
+pub(crate) fn int(o: &Object) -> Option<i64> {
     match o {
         Object::Integer(i) => Some(*i),
         Object::Real(r) => Some(*r as i64),

@@ -1,6 +1,7 @@
 import type { Layout } from "../lib/layout";
 import { clampPercent, stepZoom } from "../lib/zoom";
 import { useOrganizer } from "../organizerStore";
+import { useSign } from "../signStore";
 import { useViewer } from "../store";
 
 interface Props {
@@ -19,6 +20,7 @@ const LAYOUTS: { id: Layout; label: string }[] = [
 export function Toolbar({ onOpen, onPrint, onOrganize, onMerge }: Props) {
   const v = useViewer();
   const orgActive = useOrganizer((s) => s.active);
+  const signing = useSign((s) => s.active);
   const doc = orgActive ? null : v.doc;
   const percent = v.zoom.kind === "percent" ? v.zoom.value : Math.round(v.effectiveScale * 100);
   const btn = "rounded border px-2 py-1 disabled:opacity-40";
@@ -31,6 +33,7 @@ export function Toolbar({ onOpen, onPrint, onOrganize, onMerge }: Props) {
       {doc && (
         <>
           <button className={btn} onClick={onOrganize}>Organize pages</button>
+          <button className={btn} aria-pressed={signing} onClick={() => useSign.getState().setActive(!signing)}>Fill &amp; Sign</button>
           <button className={btn} aria-pressed={v.sidebar !== null} onClick={() => v.setSidebar(v.sidebar ? null : "thumbnails")} aria-keyshortcuts="F4">
             Sidebar
           </button>

@@ -16,3 +16,9 @@ body { margin: 0; }
   #print-root { display: block; }
   #print-root img { display: block; break-after: page; }
 }
+
+/* Bundled handwriting fonts for typed signatures (SIL OFL 1.1, see licenses/fonts). */
+@font-face { font-family: "PF Dancing Script"; src: url("./assets/fonts/DancingScript.ttf") format("truetype"); font-weight: 400 700; }
+@font-face { font-family: "PF Great Vibes"; src: url("./assets/fonts/GreatVibes.ttf") format("truetype"); }
+@font-face { font-family: "PF Caveat"; src: url("./assets/fonts/Caveat.ttf") format("truetype"); font-weight: 400 700; }
+@font-face { font-family: "PF Sacramento"; src: url("./assets/fonts/Sacramento.ttf") format("truetype"); }

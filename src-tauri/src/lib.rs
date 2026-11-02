@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod organize;
 mod platform;
+mod signatures;
 mod state;
 mod storage;
 
@@ -39,6 +40,7 @@ fn load_pdfium(app: &tauri::App) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(signatures::SigLock::default())
         .setup(|app| {
             let app_data = app.path().app_data_dir().ok();
             let storage = storage::Storage::new(app_data.clone().unwrap_or_else(|| std::env::temp_dir().join("PDF Forge")));
@@ -95,6 +97,14 @@ pub fn run() {
             organize::org_split,
             organize::pick_pdfs,
             organize::org_close,
+            signatures::sig_list,
+            signatures::sig_asset,
+            signatures::sig_create_drawn,
+            signatures::sig_process_import,
+            signatures::sig_create_image,
+            signatures::sig_rename,
+            signatures::sig_delete,
+            signatures::sign_document,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PDF Forge");
