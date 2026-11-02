@@ -3,7 +3,7 @@
 Run on Windows 10 and 11 against the installer from CI. Record what you observe.
 
 ## Interoperability (the spec requires Acrobat Reader and Chrome)
-_Already checked automatically: Edge's PDF viewer (PDFium, like Chrome) renders the app's signed (annotated and flattened) and merged output; see docs/MILESTONES.md. Acrobat Reader itself has not been tried._
+_Already checked automatically: Adobe Acrobat Reader (annotation counts: 5 annotated vs 4 flattened) and Edge's PDF viewer (PDFium, like Chrome) renders the app's signed (annotated and flattened) and merged output; see docs/MILESTONES.md. Acrobat Reader itself has not been tried._
 - [ ] Signed copy (annotations mode) opens in **Acrobat Reader**: stamp / ink / text appear at the
       placed position and rotation; they can be selected, moved and deleted.
 - [ ] Same in **Chrome** and **Edge**. Flatten mode: nothing is selectable, appearance identical.

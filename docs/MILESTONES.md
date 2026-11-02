@@ -49,11 +49,36 @@ Chrome but is **not** Acrobat Reader.
 PDF was opened and could be stamped onto the wrong file. Fixed (sign state resets when another file
 opens) with a regression test.
 
-**Still not done:** opening output in **Acrobat Reader** itself; a real screen-reader pass (only ARIA
-structure and control names were checked); installing the MSI (built, never installed); a heavy real-world
-1,000-page scan; bulk-signing driven through the real window with native folder dialogs (the bulk
-command and its events are tested through Tauri's runtime and the engine against real PDFium). See
-docs/MANUAL-QA.md.
+**Adobe Acrobat Reader (real, installed on the runner via Chocolatey) opened the app's saved files.** The
+signed-with-annotations copy shows in Acrobat's Comments panel as "Comments 5" (4 on page 1, 1 on page 2,
+each a "Signature" item with its stamp image and ink stroke visible), i.e. Acrobat treats them as real,
+editable annotations; the flattened copy shows "Comments 4" - exactly one fewer, the signature that was
+baked into the page. (A "make Acrobat your default?" prompt covers part of each screenshot, so rendering
+was judged from the visible parts and the annotation counts, not a clean full-page view.)
+
+**MSI (`windows-msi` job):** installed silently with `msiexec /qn` (per-machine), the installed app was
+attached to over CDP and asserted to load its UI and render a document (UI visible ~0.2 s after attach; a
+blank window seen in the first run was a cold WebView2 start), then uninstalled and verified gone.
+
+**Screen-reader surface:** the real Windows UI Automation tree (what Narrator/NVDA read) has a
+`ToolBar "Viewer controls"` with named buttons, `Spinner "Page number"`, `ComboBox "Page layout"`, the
+Pages/Bookmarks/Search `TabItem`s, a `Group "Document viewer"` and `Image "Page N"` items
+(`real-uia-tree.txt` on the `windows-smoke` branch). This verifies names and roles, not the experience of
+using an actual screen reader.
+
+**Bulk signing driven through the real window with the native folder pickers (passes):** input folder and
+output folder chosen in the Windows folder dialogs, preview ("Would sign 3, skip 1, fail 1" with a
+rendered sample), run (progress bar, "3 signed, 1 skipped, 1 failed", report saved), outputs and CSV on
+disk, originals byte-identical. Found and fixed: Windows' internal `\\?\` path prefix was shown to users.
+
+**Heavy document (generated 1,000-page JPEG "scan", 138 MB) on the real Windows app:** opens in ~6 s, jump
+to page 500 in ~0.5 s, five fast jumps in ~1.9 s, search across all pages ~0.1 s, organiser loads in
+~0.3 s and builds the 999-page output in ~0.4 s; memory ~200 MB while viewing, ~475 MB after the organiser.
+It is a synthetic scan, not a real-world one.
+
+**Still not done:** a real screen reader (Narrator/NVDA) used by a person; a real-world scanned file
+(rather than a generated one); a clean look at Acrobat's full-page rendering without the first-run
+prompts; signing the installers (unsigned; SmartScreen will warn); macOS/Linux builds (not wired by design).
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
