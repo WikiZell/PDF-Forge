@@ -33,11 +33,27 @@ clear-all-data; layout at 100/125/150/200 % scaling; accessibility-tree structur
 screenshot found a real usability problem (page area squeezed to ~110 px with two side panels open),
 fixed by hiding the thumbnail sidebar on narrow windows while Fill & Sign is open, now asserted by the test.
 
-**Still not done:** anything behind native dialogs (Open/Save/folder pickers, Print) was not driven
-interactively on Windows (Playwright cannot); opening output in **Acrobat Reader** (Chrome headless did not
-render the PDFs, so no independent-viewer comparison exists); a real screen-reader pass (only the ARIA
-structure/names were checked); installing the MSI (built, never installed); a heavy real-world 1,000-page
-scan. See docs/MANUAL-QA.md.
+**Native dialogs driven on Windows with real keystrokes (all pass, `e2e-real/`):** the real Windows Open
+dialog opens a PDF; the real Save dialog writes a signed copy both as annotations and flattened; the
+organiser's multi-file merge dialog adds a PDF (2 + 5 = 7 pages) and its Save dialog writes the result;
+the real Print dialog opens ("Total: 5 sheets of paper", rendered pages in the preview) and the app stays
+healthy after it is closed. Originals stay untouched; outputs are valid PDFs.
+
+**Independent viewer check (Microsoft Edge's PDF viewer, headed, on the same runner):** the files the app
+saved open and render correctly - annotation version (1 of 2 pages, Edge shows its annotation marker on
+the stamp, i.e. they are real, editable annotations), flattened version (same drawing, no marker, baked
+in), and the 7-page organised/merged file. Edge uses PDFium like Chrome, so this is a good proxy for
+Chrome but is **not** Acrobat Reader.
+
+**Bug found by looking at these real-run screenshots:** placed signatures stayed in memory when a different
+PDF was opened and could be stamped onto the wrong file. Fixed (sign state resets when another file
+opens) with a regression test.
+
+**Still not done:** opening output in **Acrobat Reader** itself; a real screen-reader pass (only ARIA
+structure and control names were checked); installing the MSI (built, never installed); a heavy real-world
+1,000-page scan; bulk-signing driven through the real window with native folder dialogs (the bulk
+command and its events are tested through Tauri's runtime and the engine against real PDFium). See
+docs/MANUAL-QA.md.
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
