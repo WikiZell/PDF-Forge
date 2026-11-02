@@ -227,11 +227,18 @@ jobs:
         run: |
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-          foreach ($f in "app-signed-annot", "app-signed-flat", "app-organized") {
+          New-Item -ItemType Directory -Force "$PWD\shots\app-output" | Out-Null
+          # A control PDF produced by Edge itself: if even this does not render in the screenshot, the
+          # problem is the environment/timing, not our files.
+          $control = "$PWD\shots\app-output\control-by-edge.pdf"
+          Start-Process -FilePath $edge -ArgumentList "--headless=new","--disable-gpu","--no-pdf-header-footer","--user-data-dir=$env:RUNNER_TEMP\edge-ctl","--print-to-pdf=$control","data:text/html,<h1>Control PDF made by Edge</h1><p>If you can read this, Edge renders PDFs here.</p>" -Wait
+          "control exists: $(Test-Path $control) size: $((Get-Item $control -ErrorAction SilentlyContinue).Length)"
+          $files = @("control-by-edge", "app-signed-annot", "app-signed-flat", "app-organized")
+          foreach ($f in $files) {
             $path = "$PWD\shots\app-output\$f.pdf"
             if (-not (Test-Path $path)) { "missing $path"; continue }
             $p = Start-Process -FilePath $edge -ArgumentList "--new-window","--user-data-dir=$env:RUNNER_TEMP\edge-$f","--no-first-run","--start-maximized","file:///$($path -replace '\\','/')" -PassThru
-            Start-Sleep -Seconds 12
+            Start-Sleep -Seconds 25
             $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
             $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
             $g = [System.Drawing.Graphics]::FromImage($bmp)

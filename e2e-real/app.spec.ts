@@ -276,7 +276,8 @@ test("native Save dialog: Fill & Sign writes a signed copy (annotations, then fl
     if (flatten) await box.check(); else await box.uncheck();
     typeIntoDialog(target);
     await page.getByRole("button", { name: "Save signed copy…" }).click();
-    await expect(page.getByText(/Saved a signed copy with 1 item/)).toBeVisible({ timeout: 30_000 });
+    // the notice includes the output path, so wait for THIS save's message, not a previous one
+    await expect(page.getByText(name, { exact: false }).filter({ hasText: /Saved a signed copy with 1 item/ })).toBeVisible({ timeout: 30_000 });
     expect(existsSync(target), `${name} must exist`).toBe(true);
     expect(statSync(target).size).toBeGreaterThan(500);
     expect(readFileSync(target).subarray(0, 5).toString()).toBe("%PDF-");
@@ -288,6 +289,7 @@ test("native Save dialog: Fill & Sign writes a signed copy (annotations, then fl
 
 test("native Save dialog from the organiser, and multi-file merge dialog", async () => {
   await signMode(false);
+  await expect(page.getByText("/ 2")).toBeVisible(); // signed-annot.pdf is the open document
   await page.getByRole("button", { name: "Organize pages" }).click();
   const grid = page.getByRole("listbox", { name: /Pages\./ }).getByRole("option");
   await expect(grid).toHaveCount(2, { timeout: 30_000 }); // signed-annot.pdf has 2 pages
