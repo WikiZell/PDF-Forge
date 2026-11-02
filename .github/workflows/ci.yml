@@ -330,25 +330,45 @@ jobs:
           "installed at $($exe.FullName)"
           "MSI_EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           Get-ChildItem (Split-Path $exe.FullName) -Recurse | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 200
-      - name: Launch the MSI-installed app on a PDF and screenshot it
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Enable WebView2 remote debugging for the installed app (CI runner only)
+        shell: pwsh
+        run: |
+          foreach ($root in "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments", "HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments") {
+            New-Item -Path $root -Force | Out-Null
+            New-ItemProperty -Path $root -Name "*" -Value "--remote-debugging-port=9444 --remote-allow-origins=*" -PropertyType String -Force | Out-Null
+          }
+      - name: Launch the MSI-installed app and assert that it really loads and renders the document
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force shots | Out-Null
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $pdf = "$PWD\tests\fixtures\text-3page-outline.pdf"
-          $p = Start-Process -FilePath $env:MSI_EXE -ArgumentList "`"$pdf`"" -PassThru
-          Start-Sleep -Seconds 15
-          $p.Refresh()
-          "exited=$($p.HasExited) title='$($p.MainWindowTitle)'"
-          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
-          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-          $g = [System.Drawing.Graphics]::FromImage($bmp)
-          $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
-          $bmp.Save("$PWD\shots\msi-installed-app.png"); $g.Dispose(); $bmp.Dispose()
-          if ($p.HasExited) { Write-Error "MSI-installed app exited early (code $($p.ExitCode))"; exit 1 }
-          if ($p.MainWindowTitle -notlike "PDF Forge*") { Write-Error "unexpected window title"; exit 1 }
-          Stop-Process -Id $p.Id -Force
+          # a desktop screenshot a little after launch, as well as the in-page assertions below
+          Start-Job -ScriptBlock {
+            param($dir)
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            foreach ($s in 20, 50) {
+              Start-Sleep -Seconds $(if ($s -eq 20) { 20 } else { 30 })
+              $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+              $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+              $bmp.Save("$dir\msi-desktop-$s.png"); $g.Dispose(); $bmp.Dispose()
+            }
+          } -ArgumentList "$PWD\shots" | Out-Null
+          npx playwright test -c playwright.real.config.ts e2e-real/msi-smoke.spec.ts
+        env:
+          APP_EXE: ${{ env.MSI_EXE }}
+          PDF_FILE: ${{ github.workspace }}\tests\fixtures\text-3page-outline.pdf
+          SHOTS_DIR: ${{ github.workspace }}\shots
+      - name: Stop the app
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process pdf-forge -ErrorAction SilentlyContinue | Stop-Process -Force
           Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
       - name: Uninstall the MSI and verify it is gone
         shell: pwsh
         run: |
@@ -373,7 +393,7 @@ jobs:
         run: |
           $dest = "$env:RUNNER_TEMP\wm"
           New-Item -ItemType Directory -Force $dest | Out-Null
-          Copy-Item shots\*.png $dest -ErrorAction SilentlyContinue
+          Copy-Item shots\*.png, shots\*.json $dest -ErrorAction SilentlyContinue
           "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
           Set-Location $dest
           git init -q -b windows-msi
