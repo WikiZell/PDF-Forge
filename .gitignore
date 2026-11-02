@@ -8,3 +8,4 @@ playwright-report/
 fuzz/target/
 fuzz/corpus/
 fuzz/artifacts/
+release/

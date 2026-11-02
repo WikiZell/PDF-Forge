@@ -71,6 +71,8 @@ jobs:
   windows:
     name: Build Windows installers (unsigned)
     runs-on: windows-latest
+    permissions:
+      contents: write   # only to publish the installers to the `windows-builds` branch
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -97,6 +99,23 @@ jobs:
             target/release/bundle/msi/*.msi
             target/release/bundle/nsis/*.exe
           if-no-files-found: error
+      - name: Publish installers to the windows-builds branch (so they can be fetched with git)
+        if: github.ref_type == 'branch' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $dest = "$env:RUNNER_TEMP\wb"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item target\release\bundle\msi\*.msi, target\release\bundle\nsis\*.exe $dest
+          "built from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\BUILD-INFO.txt" -Encoding utf8
+          Set-Location $dest
+          git init -q -b windows-builds
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Windows installers from $env:GITHUB_SHA"
+          git push -f "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" windows-builds
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   windows-smoke:
     name: Windows smoke (install, launch on WebView2, Chrome render)
