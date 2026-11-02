@@ -230,12 +230,7 @@ jobs:
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
           New-Item -ItemType Directory -Force "$PWD\shots\app-output" | Out-Null
-          # A control PDF produced by Edge itself: if even this does not render in the screenshot, the
-          # problem is the environment/timing, not our files.
-          $control = "$PWD\shots\app-output\control-by-edge.pdf"
-          Start-Process -FilePath $edge -ArgumentList "--headless=new","--disable-gpu","--no-pdf-header-footer","--user-data-dir=$env:RUNNER_TEMP\edge-ctl","--print-to-pdf=$control","data:text/html,<h1>Control PDF made by Edge</h1><p>If you can read this, Edge renders PDFs here.</p>" -Wait
-          "control exists: $(Test-Path $control) size: $((Get-Item $control -ErrorAction SilentlyContinue).Length)"
-          $files = @("control-by-edge", "app-signed-annot", "app-signed-flat", "app-organized")
+          $files = @("app-signed-annot", "app-signed-flat", "app-organized")
           foreach ($f in $files) {
             $path = "$PWD\shots\app-output\$f.pdf"
             if (-not (Test-Path $path)) { "missing $path"; continue }
@@ -284,7 +279,10 @@ jobs:
           name: windows-smoke-screenshots
           path: |
             shots/*.png
+            shots/*.json
+            shots/*.txt
             samples/*.pdf
+            !samples/scan-1000.pdf
           if-no-files-found: warn
       - name: Publish screenshots to the windows-smoke branch (so they can be viewed)
         if: always() && github.ref_type == 'branch' && github.event_name == 'push'
@@ -293,8 +291,8 @@ jobs:
           $dest = "$env:RUNNER_TEMP\ws"
           New-Item -ItemType Directory -Force $dest | Out-Null
           Copy-Item shots\*.png, shots\*.txt, shots\*.json $dest -ErrorAction SilentlyContinue
-          Copy-Item shots\app-output\*.pdf $dest -ErrorAction SilentlyContinue
-          Copy-Item samples\*.pdf $dest -ErrorAction SilentlyContinue
+          # GitHub rejects files > 100 MB, so only publish small PDFs (not the 130 MB scan)
+          Get-ChildItem shots\app-output\*.pdf, samples\*.pdf -ErrorAction SilentlyContinue | Where-Object Length -lt 5MB | Copy-Item -Destination $dest
           "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
           Set-Location $dest
           git init -q -b windows-smoke
