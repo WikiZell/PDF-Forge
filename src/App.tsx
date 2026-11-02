@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { PasswordDialog } from "./components/PasswordDialog";
+import { Organizer } from "./components/Organizer";
+import { pickPdfs } from "./lib/organize-api";
+import { useOrganizer } from "./organizerStore";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { Viewer } from "./components/Viewer";
@@ -16,6 +19,7 @@ const basename = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
 export function App() {
   const v = useViewer();
+  const org = useOrganizer();
   const [libError, setLibError] = useState<string | null>(null);
   const [wrongPw, setWrongPw] = useState(false);
 
@@ -109,7 +113,15 @@ export function App() {
 
   return (
     <div id="app-root" className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
-      <Toolbar onOpen={openDialog} onPrint={print} />
+      <Toolbar
+        onOpen={openDialog}
+        onPrint={print}
+        onOrganize={() => v.doc && org.start([v.doc.path])}
+        onMerge={async () => {
+          const paths = await pickPdfs().catch(() => []);
+          if (paths.length) await org.start(paths);
+        }}
+      />
 
       {libError && (
         <div role="alert" className="border-b border-red-300 bg-red-100 px-3 py-2 text-sm text-red-900">{libError}</div>
@@ -121,7 +133,9 @@ export function App() {
         </div>
       )}
 
-      {v.doc ? (
+      {org.active ? (
+        <Organizer onClose={() => org.close()} />
+      ) : v.doc ? (
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <Viewer />

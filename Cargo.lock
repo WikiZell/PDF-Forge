@@ -2469,6 +2469,7 @@ name = "pdf-core"
 version = "0.1.0"
 dependencies = [
  "lopdf",
+ "pdf-render",
 ]
 
 [[package]]

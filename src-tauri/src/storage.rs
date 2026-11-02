@@ -44,6 +44,7 @@ impl Storage {
         Self { dir }
     }
 
+    #[allow(dead_code)]
     pub fn dir(&self) -> &Path {
         &self.dir
     }

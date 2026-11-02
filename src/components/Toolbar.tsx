@@ -1,10 +1,13 @@
 import type { Layout } from "../lib/layout";
 import { clampPercent, stepZoom } from "../lib/zoom";
+import { useOrganizer } from "../organizerStore";
 import { useViewer } from "../store";
 
 interface Props {
   onOpen: () => void;
   onPrint: () => void;
+  onOrganize: () => void;
+  onMerge: () => void;
 }
 
 const LAYOUTS: { id: Layout; label: string }[] = [
@@ -13,9 +16,10 @@ const LAYOUTS: { id: Layout; label: string }[] = [
   { id: "two-page", label: "Two pages" },
 ];
 
-export function Toolbar({ onOpen, onPrint }: Props) {
+export function Toolbar({ onOpen, onPrint, onOrganize, onMerge }: Props) {
   const v = useViewer();
-  const { doc } = v;
+  const orgActive = useOrganizer((s) => s.active);
+  const doc = orgActive ? null : v.doc;
   const percent = v.zoom.kind === "percent" ? v.zoom.value : Math.round(v.effectiveScale * 100);
   const btn = "rounded border px-2 py-1 disabled:opacity-40";
   return (
@@ -23,8 +27,10 @@ export function Toolbar({ onOpen, onPrint }: Props) {
       <button className="rounded bg-blue-600 px-3 py-1 text-white" onClick={onOpen} disabled={v.busy} aria-keyshortcuts="Control+O">
         Open…
       </button>
+      <button className={btn} onClick={onMerge} disabled={v.busy}>Merge PDFs…</button>
       {doc && (
         <>
+          <button className={btn} onClick={onOrganize}>Organize pages</button>
           <button className={btn} aria-pressed={v.sidebar !== null} onClick={() => v.setSidebar(v.sidebar ? null : "thumbnails")} aria-keyshortcuts="F4">
             Sidebar
           </button>

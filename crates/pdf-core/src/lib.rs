@@ -4,8 +4,18 @@
 //! inspector. Page-tree operations, merge/split, annotations and the bulk-job
 //! engine arrive in later milestones.
 
+pub mod build;
 pub mod fs_safety;
 pub mod inspect;
+pub mod load;
+pub mod split;
+pub mod model;
 
 pub use fs_safety::{atomic_write, sanitize_file_name, unique_output_path, AllowedPaths, Limits, PathError};
 pub use inspect::{inspect, DocInfo, InspectError};
+
+pub use build::{build, BuildError, BuildReport, FieldRename};
+pub use model::{parse_ranges, BlankSize, EditError, PageEntry, PageKind, Project};
+pub use load::{load_bytes, load_file, LoadError};
+pub use split::{split_by_bookmarks, split_every_n, split_ranges, top_level_bookmarks, SplitPart};
+pub use lopdf;

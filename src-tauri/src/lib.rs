@@ -1,5 +1,6 @@
 mod commands;
 mod error;
+mod organize;
 mod platform;
 mod state;
 mod storage;
@@ -84,6 +85,16 @@ pub fn run() {
             commands::forget_recent,
             commands::save_view_state,
             commands::clear_app_data,
+            organize::org_new,
+            organize::org_add_file,
+            organize::org_edit,
+            organize::org_thumb,
+            organize::org_preview,
+            organize::org_save_as,
+            organize::org_save_over,
+            organize::org_split,
+            organize::pick_pdfs,
+            organize::org_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PDF Forge");
