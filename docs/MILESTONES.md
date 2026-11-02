@@ -97,12 +97,12 @@ consistent across both runs: the stamp image and ink stroke on page 1 and "Comme
 "Comments 4" (flattened copy). Clean full-page renderings of the same files exist from Edge's PDF viewer and
 Chrome (both PDFium). I am not pursuing this further in CI.
 
-**Acrobat, final re-run (run 41541590294, commit 5ee4487):** sending `n` / `Alt+N` / `Tab,Enter` dismissed the
-"make Acrobat your default?" prompt. Real Adobe Acrobat Reader now shows the app's **flattened** signed copy
-(`acrobat-app-signed-flat.png` on `windows-smoke`) with the checkerboard stamp image on both pages, the ink
-stroke and the text box visible at full width; only a taskbar-pin toast sits in the corner. The annotated copy
-(`acrobat-app-signed-annot.png`) was captured while Acrobat's "Welcome" upsell dialog was open, so the
-annotated copy's full page is not shown cleanly (its annotations were confirmed earlier via "Comments 5").
+**Acrobat, final re-runs (runs 41541590294 and 41544983123):** key presses dismissed the "make Acrobat your
+default?" prompt, and opening a throwaway file first absorbed the first-run upsell dialog. Real Adobe Acrobat
+Reader now shows **both** the annotated copy (`acrobat-app-signed-annot.png`) and the flattened copy
+(`acrobat-app-signed-flat.png`) on the `windows-smoke` branch, at full width, with the checkerboard stamp
+image on both pages, the ink stroke and the text box visible; only a taskbar-pin toast sits in the corner.
+Acrobat's comment panel counts them as 5 (annotated) vs 4 (flattened).
 
 **Still not done:** a person using a screen reader; signing the installers (unsigned; SmartScreen will warn -
 needs an Authenticode certificate, the CI hook is in place); OCR for scans (not in the spec); macOS/Linux
