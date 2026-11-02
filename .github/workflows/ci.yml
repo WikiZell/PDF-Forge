@@ -222,6 +222,34 @@ jobs:
         env:
           SAMPLES_DIR: ${{ github.workspace }}\samples
           SHOTS_DIR: ${{ github.workspace }}\shots
+      - name: Genuine scanned document (public-domain scan downloaded on the runner)
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          $urls = @(
+            "https://archive.org/download/originofspecies00darwuoft/originofspecies00darwuoft.pdf",
+            "https://upload.wikimedia.org/wikipedia/commons/8/8f/Darwin_-_On_the_Origin_of_Species_1859.pdf",
+            "https://archive.org/download/adventuresofsherl00doyl/adventuresofsherl00doyl.pdf"
+          )
+          $dest = "$PWD\samples\real-scan.pdf"
+          foreach ($u in $urls) {
+            try { Invoke-WebRequest $u -OutFile $dest -UseBasicParsing -TimeoutSec 240; if ((Get-Item $dest).Length -gt 200KB) { "downloaded $u ($((Get-Item $dest).Length) bytes)"; break } } catch { "failed $u : $_" }
+          }
+          if (-not (Test-Path $dest)) { "no real scan could be downloaded"; exit 0 }
+          $env:REAL_SCAN = $dest; $env:ONLY_SCAN = "1"
+          npx playwright test -c playwright.real.config.ts
+        env:
+          SHOTS_DIR: ${{ github.workspace }}\shots
+      - name: NVDA screen reader pass (speech log of tabbing through the real app)
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          choco install nvda -y --no-progress 2>&1 | Select-Object -Last 8
+          ./e2e-real/nvda.ps1 -AppExe $env:APP_EXE -Pdf "$PWD\samples\merged.pdf" -OutDir "$PWD\shots"
       - name: Open the files the app saved in Microsoft Edge's PDF viewer (independent of our rendering)
         if: always()
         shell: pwsh
@@ -259,13 +287,17 @@ jobs:
             New-Item -Path $k -Force -ErrorAction SilentlyContinue | Out-Null
             New-ItemProperty -Path $k -Name EULA -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
           }
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing, Microsoft.VisualBasic
           foreach ($f in "app-signed-annot", "app-signed-flat", "app-organized") {
             $path = "$PWD\shots\app-output\$f.pdf"
             if (-not (Test-Path $path)) { "missing $path"; continue }
             $p = Start-Process -FilePath $reader.FullName -ArgumentList "`"$path`"" -PassThru
             # the very first launch on a fresh runner sits on the splash screen for a long time
             Start-Sleep -Seconds $(if ($f -eq "app-signed-annot") { 120 } else { 45 })
+            # dismiss first-run toasts/dialogs, then Fit page (Ctrl+0 / Ctrl+Shift+H) with the toolbar hidden (F4)
+            try { [Microsoft.VisualBasic.Interaction]::AppActivate("Adobe Acrobat Reader") } catch {}
+            foreach ($k in "{ESC}", "{ESC}", "{F4}", "^+h") { [System.Windows.Forms.SendKeys]::SendWait($k); Start-Sleep -Milliseconds 800 }
+            Start-Sleep -Seconds 4
             $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
             $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
             $g = [System.Drawing.Graphics]::FromImage($bmp)
