@@ -14,7 +14,9 @@ pub mod sigimage;
 pub mod sign;
 pub mod split;
 
-pub use fs_safety::{atomic_write, sanitize_file_name, unique_output_path, AllowedPaths, Limits, PathError};
+pub use fs_safety::{
+    atomic_write, sanitize_file_name, unique_output_path, write_new_atomic, AllowedPaths, Limits, PathError,
+};
 pub use inspect::{inspect, DocInfo, InspectError};
 
 pub use build::{build, BuildError, BuildReport, FieldRename};

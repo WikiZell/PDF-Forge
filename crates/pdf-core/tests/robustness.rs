@@ -236,3 +236,22 @@ fn split_parts_build_independently() {
         assert_eq!(markers(&d), [format!("A-P{}", i * 2), format!("A-P{}", i * 2 + 1)]);
     }
 }
+
+#[test]
+fn fuzz_regressions_complete_quickly() {
+    // Inputs found by cargo-fuzz that once hung or crashed. Each must finish promptly.
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/fuzz-regressions");
+    let lim = Limits { max_file_size: 4 << 20, max_pages: 500 };
+    let mut n = 0;
+    for e in std::fs::read_dir(dir).unwrap() {
+        let bytes = std::fs::read(e.unwrap().path()).unwrap();
+        let t = std::time::Instant::now();
+        if let Ok(d) = load_bytes(&bytes, None, &lim) {
+            let p = project_of(vec![("r.pdf", d)]);
+            let _ = build(&p, None);
+        }
+        assert!(t.elapsed().as_secs() < 5, "regression input took {:?}", t.elapsed());
+        n += 1;
+    }
+    assert!(n >= 1);
+}

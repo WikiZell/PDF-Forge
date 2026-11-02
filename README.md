@@ -12,7 +12,7 @@ or Linux.
 * **PDFs are untrusted.** Size/page limits (configurable in Settings), parser panics contained,
   PDFium work time-boxed, PDF JavaScript never executed, paths validated, output names sanitised.
 
-See [docs/MILESTONES.md](docs/MILESTONES.md) for exactly what is verified and what is not.
+See [docs/MILESTONES.md](docs/MILESTONES.md) for exactly what is verified (including the Windows cross-build/Wine run and the fuzz results) and what is not.
 
 ## Features
 

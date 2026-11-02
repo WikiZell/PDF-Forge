@@ -642,7 +642,7 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
     report.warnings.sort();
     report.warnings.dedup();
 
-    out.prune_objects();
+    prune_unreachable(&mut out);
     let mut bytes = Vec::new();
     out.save_to(&mut bytes).map_err(|e| BuildError::Pdf(e.to_string()))?;
     Ok((bytes, report))
@@ -678,4 +678,28 @@ fn field_survives(doc: &mut Document, id: ObjectId, alive: &HashSet<ObjectId>, d
             any
         }
     }
+}
+
+/// Remove objects not reachable from the trailer. Iterative with a visited set, so shared or
+/// cyclic object graphs in hostile files cost linear time (lopdf's own `prune_objects` revisits
+/// shared objects and can take exponential time; found by fuzzing).
+fn prune_unreachable(doc: &mut Document) {
+    let mut seen: HashSet<ObjectId> = HashSet::new();
+    let mut stack: Vec<&Object> = doc.trailer.iter().map(|(_, v)| v).collect();
+    while let Some(o) = stack.pop() {
+        match o {
+            Object::Reference(id) => {
+                if seen.insert(*id) {
+                    if let Some(t) = doc.objects.get(id) {
+                        stack.push(t);
+                    }
+                }
+            }
+            Object::Array(a) => stack.extend(a.iter()),
+            Object::Dictionary(d) => stack.extend(d.iter().map(|(_, v)| v)),
+            Object::Stream(s) => stack.extend(s.dict.iter().map(|(_, v)| v)),
+            _ => {}
+        }
+    }
+    doc.objects.retain(|id, _| seen.contains(id));
 }

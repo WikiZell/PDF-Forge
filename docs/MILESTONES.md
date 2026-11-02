@@ -2,8 +2,27 @@
 
 Legend: **verified** = covered by an automated test that ran; **observed** = exercised by hand in the
 running app under a virtual display on Linux (WebKitGTK); **not verified** = not run anywhere yet.
-Nothing has been run on Windows or WebView2, and nothing has been opened in Acrobat Reader or
-Chrome's PDF viewer. The first `windows-latest` CI run and docs/MANUAL-QA.md close those gaps.
+
+## Windows status (honest summary)
+Done here: the whole app cross-compiles to a Windows x64 release `pdf-forge.exe` (PE32+ GUI, CSP
+embedded) with `x86_64-pc-windows-gnu`, and the entire `pdf-core` + `pdf-render` test suite
+(104 tests: signing geometry, bulk, merge/organise, encryption, fuzz regressions, perf) was run as
+**Windows executables under Wine against the real Windows `pdfium.dll`** — all pass.
+Cross-testing found one real Windows-only bug (bulk output publishing used create-then-rename,
+which fails with "Access denied" on Windows semantics); it now publishes with a temp file + hard link
+(`write_new_atomic`), covered by tests.
+**Not done:** running the GUI on WebView2, and producing the MSI/NSIS installers — NSIS bundling
+stopped because this sandbox's proxy blocks `go.microsoft.com` (WebView2 bootstrapper download), and
+WiX needs Windows. The `windows-latest` CI job does both; its first run is still the acceptance
+test for the installers. Also never opened in Acrobat Reader / Chrome's viewer.
+
+## Fuzzing
+`cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
+hang within minutes: lopdf's `prune_objects` is exponential on shared/cyclic object graphs
+(timeout >20 s on a 1 KB input). Replaced by a linear visited-set prune in `pdf-core::build`; the
+input is kept as `tests/fixtures/fuzz-regressions/` and asserted by a test. After the fix:
+**118,956 runs / 301 s with no crash, hang or OOM**, and `split_ranges` ran 885,522 times clean.
+This is a first pass, not an exhaustive one; CI runs a 2-minute pass on every push.
 
 ## 1. Scaffold
 Works: Tauri 2 + React/Vite/Tailwind/Zustand, workspace crates, PDFium loading with a clear error
@@ -33,8 +52,7 @@ Gaps: save dialogs not driven in the GUI (the write path is covered by core test
 Verified: merge of 3 documents with colliding field names (every rename reported), split by N /
 ranges / bookmarks, encrypted (AES-128, RC4) with right/wrong/no password, corrupt/truncated
 inputs, 6,000-iteration deterministic mutation fuzz (load → edit → rebuild → sign) with zero panics.
-Gaps: libFuzzer targets exist (`fuzz/`) but **have not been run** (no nightly/cargo-fuzz here;
-wired into CI). No AES-256 (V5/R6) fixture.
+Gaps: no AES-256 (V5/R6) fixture. See "Fuzzing" above for the libFuzzer results.
 
 ## 5. Signatures
 Verified (by rendering with PDFium): placement at the exact requested rectangle for page rotation
@@ -54,7 +72,7 @@ Observed: UI renders; add-folder reported a clear error on an invalid selection.
 unreliable; the E2E mock covers the UI side only).
 
 ## 7. Hardening
-Done: configurable limits, render/open timeouts, panic containment, fuzz harness, licence inventory
+Done: configurable limits, render/open timeouts, panic containment, fuzz harness (run, bug fixed), licence inventory
 with a disallowed-licence gate, modal focus management (found by an E2E test), clippy clean in
 shipped code, formatted. Not done: accessibility audit with a real screen reader; DPI testing; a
 heavy real-world 1,000-page profile; installer polish; the MSI is per-machine.

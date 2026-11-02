@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use crate::fs_safety::{atomic_write, unique_output_path, Limits};
+use crate::fs_safety::{unique_output_path, write_new_atomic, Limits};
 use crate::load::{load_file, LoadError};
 use crate::sign::{apply, Content, Mode, Placement};
 
@@ -308,24 +308,18 @@ fn process_file(file: &Path, job: &Job<'_>) -> FileResult {
         Ok(Prepared::Failed(error)) => Outcome::Failed { error },
         Ok(Prepared::Ready { bytes, placed, .. }) => {
             let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "document".into());
-            // unique_output_path + create-new semantics: retry if another worker grabbed the name.
+            // pick a free name, publish atomically; if another worker took it first, pick again
             let mut result = Outcome::Failed { error: "could not create an output file".into() };
-            for _ in 0..50 {
+            for _ in 0..200 {
                 let out = unique_output_path(&job.out_dir, &stem, &job.suffix, "pdf");
-                match reserve(&out) {
+                match write_new_atomic(&out, &bytes) {
                     Ok(()) => {
-                        result = match atomic_write(&out, &bytes, false) {
-                            Ok(()) => Outcome::Signed { output: out, placed },
-                            Err(e) => {
-                                let _ = std::fs::remove_file(&out);
-                                Outcome::Failed { error: format!("could not write output: {e}") }
-                            }
-                        };
+                        result = Outcome::Signed { output: out, placed };
                         break;
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
                     Err(e) => {
-                        result = Outcome::Failed { error: format!("could not create output: {e}") };
+                        result = Outcome::Failed { error: format!("could not write output: {e}") };
                         break;
                     }
                 }
@@ -334,11 +328,6 @@ fn process_file(file: &Path, job: &Job<'_>) -> FileResult {
         }
     };
     FileResult { input: file.to_path_buf(), outcome }
-}
-
-/// Atomically claim a file name (fails if it exists) so parallel workers never collide.
-fn reserve(path: &Path) -> std::io::Result<()> {
-    std::fs::OpenOptions::new().write(true).create_new(true).open(path).map(|_| ())
 }
 
 #[derive(Debug, Clone)]

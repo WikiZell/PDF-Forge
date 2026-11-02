@@ -125,6 +125,7 @@ mod tests {
 
     fn temp_dir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("pdf-core-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d); // PIDs can repeat across runs; always start empty
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -211,6 +212,40 @@ pub fn atomic_write(dest: &Path, bytes: &[u8], backup: bool) -> std::io::Result<
     result
 }
 
+/// Create `dest` with `bytes` only if it does not exist, atomically: the content is written to a
+/// temp file first and then *published* with a hard link, which fails if `dest` exists. Readers
+/// never see a partial file and nothing is ever overwritten. On file systems without hard links
+/// (FAT/exFAT) it falls back to exclusive-create + write, which still never overwrites.
+/// Returns `AlreadyExists` if the name is taken so the caller can pick another.
+pub fn write_new_atomic(dest: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = dest.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let name = dest.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = dir.join(format!(".{name}.{}.{n}.tmp", std::process::id()));
+    {
+        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+    }
+    let result = match std::fs::hard_link(&tmp, dest) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(e),
+        Err(_) => {
+            // no hard links here: exclusive create + write
+            match std::fs::OpenOptions::new().write(true).create_new(true).open(dest) {
+                Ok(mut f) => f.write_all(bytes).and_then(|_| f.sync_all()).inspect_err(|_| {
+                    let _ = std::fs::remove_file(dest);
+                }),
+                Err(e) => Err(e),
+            }
+        }
+    };
+    let _ = std::fs::remove_file(&tmp);
+    result
+}
+
 /// Choose `<stem><suffix>.<ext>` in `dir`, adding " (2)", " (3)", ... so nothing is overwritten.
 pub fn unique_output_path(dir: &Path, stem: &str, suffix: &str, ext: &str) -> PathBuf {
     let stem = sanitize_file_name(stem);
@@ -227,6 +262,7 @@ mod write_tests {
 
     fn dir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("pdf-core-w-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -253,6 +289,23 @@ mod write_tests {
         let d = dir("atomicfail");
         let f = d.join("sub").join("missing-dir.bin"); // parent missing
         assert!(atomic_write(&f, b"x", false).is_err());
+    }
+
+    #[test]
+    fn write_new_atomic_never_overwrites_and_leaves_no_temp() {
+        let d = dir("newatomic");
+        let f = d.join("out.pdf");
+        write_new_atomic(&f, b"first").unwrap();
+        let e = write_new_atomic(&f, b"second").unwrap_err();
+        assert_eq!(e.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read(&f).unwrap(), b"first");
+        assert_eq!(
+            std::fs::read_dir(&d)
+                .unwrap()
+                .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().ends_with(".tmp"))
+                .count(),
+            0
+        );
     }
 
     #[test]
