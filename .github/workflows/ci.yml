@@ -121,6 +121,8 @@ jobs:
     name: Windows smoke (install, launch on WebView2, Chrome render)
     needs: windows
     runs-on: windows-latest
+    permissions:
+      contents: write   # only to publish screenshots to the `windows-smoke` branch
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -191,3 +193,21 @@ jobs:
             shots/*.png
             samples/*.pdf
           if-no-files-found: warn
+      - name: Publish screenshots to the windows-smoke branch (so they can be viewed)
+        if: always() && github.ref_type == 'branch' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $dest = "$env:RUNNER_TEMP\ws"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item shots\*.png $dest -ErrorAction SilentlyContinue
+          Copy-Item samples\*.pdf $dest -ErrorAction SilentlyContinue
+          "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
+          Set-Location $dest
+          git init -q -b windows-smoke
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Windows smoke screenshots from $env:GITHUB_SHA"
+          git push -f "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" windows-smoke
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
