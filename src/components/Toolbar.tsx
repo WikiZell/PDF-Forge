@@ -62,7 +62,7 @@ export function Toolbar({ onOpen, onPrint, onOrganize, onMerge, onBulk, onSettin
           <label className="text-sm">
             <span className="sr-only">Zoom percent</span>
             <input
-              type="number" min={25} max={400} step={5} value={percent}
+              type="number" min={25} max={400} step={1} value={percent}
               onChange={(e) => v.setZoom({ kind: "percent", value: clampPercent(Number(e.target.value)) })}
               className="w-16 rounded border px-1 py-0.5 dark:bg-neutral-800"
             />

@@ -76,9 +76,24 @@ to page 500 in ~0.5 s, five fast jumps in ~1.9 s, search across all pages ~0.1 s
 ~0.3 s and builds the 999-page output in ~0.4 s; memory ~200 MB while viewing, ~475 MB after the organiser.
 It is a synthetic scan, not a real-world one.
 
-**Still not done:** a real screen reader (Narrator/NVDA) used by a person; a real-world scanned file
-(rather than a generated one); a clean look at Acrobat's full-page rendering without the first-run
-prompts; signing the installers (unsigned; SmartScreen will warn); macOS/Linux builds (not wired by design).
+**Genuine scanned document (run 41534422260, commit 2373b19):** the runner downloaded a real public-domain
+archive.org book scan (568 pages, 25.4 MB, image-only pages) and the installed app opened it: first page
+rendered in 1.7 s, "/ 568" shown, thumbnails and page bitmaps correct (`real-genuine-scan.png`,
+`real-genuine-scan-metrics.json` on `windows-smoke`). A search for "the" took ~3 s and reported nothing
+(no text layer, no OCR - by design; OCR is not in the spec).
+
+**Real screen reader (NVDA 20xx on the runner, `nvda-speech.txt`):** NVDA was started with debug logging and
+the app was tabbed through; NVDA announced "Viewer controls tool bar", each toolbar button by name with its
+shortcut ("Open…, Control+O"), toggle states ("Fill & Sign toggle button not pressed", "Fit width pressed"),
+"Page number spin button", "Page layout combo box", "Sidebar complementary landmark", "Pages tab 1 of 3",
+"Go to page 1 button current page". It also exposed a real defect: the zoom field was announced as
+"invalid entry" because `step=5` made values like 181 or 217 invalid; fixed (`step=1`). This is NVDA
+driven by a script, not a blind or low-vision person using the app.
+
+**Still not done:** a person using a screen reader; a clean full-page Acrobat rendering (the first-run
+"make Acrobat your default?" prompt still covered the page in run 41534422260; the next run clicks "No"
+through UI Automation, result to be recorded); signing the installers (unsigned; SmartScreen will warn -
+needs an Authenticode certificate, the CI hook is in place); macOS/Linux builds (not wired by design).
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real

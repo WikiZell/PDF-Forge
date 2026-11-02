@@ -20,7 +20,7 @@ _Automated on the real Windows app via CDP device-metrics emulation (no overflow
 ## Accessibility
 - [ ] Everything reachable with Tab/Shift+Tab; visible focus ring; no keyboard traps; dialogs
       trap focus, Escape closes and returns focus (covered by E2E for Split).
-- [ ] Screen reader (Narrator/NVDA): toolbar buttons, tabs, page grid ("Page 3, rotated 90
+- [ ] (NVDA scripted pass done in CI; a person should repeat it) Screen reader (Narrator/NVDA): toolbar buttons, tabs, page grid ("Page 3, rotated 90
       degrees", selected state), signature items, progress bar and status messages are announced.
 - [ ] Windows **High Contrast** theme: controls remain visible (CSS `forced-colors` rules).
 - [ ] Keyboard: Ctrl+O/F/P/±/0, PageUp/Down, Home/End, F3, F4; organiser Ctrl+A/Z/Y, Delete,

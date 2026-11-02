@@ -296,6 +296,13 @@ jobs:
             Start-Sleep -Seconds $(if ($f -eq "app-signed-annot") { 120 } else { 45 })
             # dismiss first-run toasts/dialogs, then Fit page (Ctrl+0 / Ctrl+Shift+H) with the toolbar hidden (F4)
             try { [Microsoft.VisualBasic.Interaction]::AppActivate("Adobe Acrobat Reader") } catch {}
+            # click "No" on the "make Acrobat your default?" prompt through UI Automation (keystrokes do not reach it)
+            Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+            for ($t = 0; $t -lt 3; $t++) {
+              $cond = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty), "No"
+              $btn = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+              if ($btn) { try { $btn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); "dismissed default-app prompt" } catch { "invoke failed: $_" }; Start-Sleep -Seconds 2 }
+            }
             foreach ($k in "{ESC}", "{ESC}", "{F4}", "^+h") { [System.Windows.Forms.SendKeys]::SendWait($k); Start-Sleep -Milliseconds 800 }
             Start-Sleep -Seconds 4
             $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
