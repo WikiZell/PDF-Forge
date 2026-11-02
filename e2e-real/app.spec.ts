@@ -231,6 +231,12 @@ function typeIntoDialog(text: string, delayMs = 3000) {
   spawnProc("pwsh", ["-NoProfile", "-File", join(HERE, "send-keys.ps1"), "-Keys", keys, "-DelayMs", String(delayMs)], { stdio: "ignore" });
 }
 
+/** Folder pickers: Enter navigates into the typed folder, a second Enter on the empty field selects it. */
+function typeIntoFolderDialog(text: string, delayMs = 3500) {
+  const keys = text.replace(/[+^%~(){}[\]]/g, (c) => `{${c}}`) + "{ENTER}";
+  spawnProc("pwsh", ["-NoProfile", "-File", join(HERE, "send-keys.ps1"), "-Keys", keys, "-DelayMs", String(delayMs), "-Keys2", "{ENTER}", "-Delay2Ms", "2000"], { stdio: "ignore" });
+}
+
 test("native Open dialog: open a PDF through the real Windows file dialog", async () => {
   mkdirSync(OUT, { recursive: true });
   await page.keyboard.press("Escape");
@@ -354,10 +360,10 @@ test("bulk signing through the real window: native folder pickers, preview, run,
   const originals = ["contract_a.pdf", "contract_b.pdf", "contract_c.pdf", "no_anchor.pdf", "broken.pdf"].map((n) => [n, readFileSync(join(input, n))] as const);
 
   await page.getByRole("button", { name: "Bulk sign…" }).click();
-  typeIntoDialog(input, 3500);
+  typeIntoFolderDialog(input);
   await page.getByRole("button", { name: "Add folder…" }).click();
   await expect(page.getByText("5 file(s) selected")).toBeVisible({ timeout: 40_000 });
-  typeIntoDialog(output, 3500);
+  typeIntoFolderDialog(output);
   await page.getByRole("button", { name: "Choose output folder…" }).click();
   await expect(page.getByText(output.replace(/\\/g, "\\")).first()).toBeVisible({ timeout: 40_000 });
 
