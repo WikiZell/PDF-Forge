@@ -288,12 +288,13 @@ jobs:
             New-ItemProperty -Path $k -Name EULA -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
           }
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing, Microsoft.VisualBasic
-          foreach ($f in "app-signed-annot", "app-signed-flat", "app-organized") {
+          # the first launch shows first-run dialogs, so open a throwaway file first ("app-organized" is captured twice)
+          foreach ($f in "app-organized", "app-signed-annot", "app-signed-flat", "app-organized") {
             $path = "$PWD\shots\app-output\$f.pdf"
             if (-not (Test-Path $path)) { "missing $path"; continue }
             $p = Start-Process -FilePath $reader.FullName -ArgumentList "`"$path`"" -PassThru
             # the very first launch on a fresh runner sits on the splash screen for a long time
-            Start-Sleep -Seconds $(if ($f -eq "app-signed-annot") { 120 } else { 45 })
+            Start-Sleep -Seconds $(if ($script:first -ne 1) { $script:first = 1; 120 } else { 45 })
             # dismiss first-run toasts/dialogs, then Fit page (Ctrl+0 / Ctrl+Shift+H) with the toolbar hidden (F4)
             try { [Microsoft.VisualBasic.Interaction]::AppActivate("Adobe Acrobat Reader") } catch {}
             # click "No" on the "make Acrobat your default?" prompt through UI Automation (keystrokes do not reach it)
