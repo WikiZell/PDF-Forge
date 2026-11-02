@@ -220,6 +220,26 @@ jobs:
         env:
           SAMPLES_DIR: ${{ github.workspace }}\samples
           SHOTS_DIR: ${{ github.workspace }}\shots
+      - name: Open the files the app saved in Microsoft Edge's PDF viewer (independent of our rendering)
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+          foreach ($f in "app-signed-annot", "app-signed-flat", "app-organized") {
+            $path = "$PWD\shots\app-output\$f.pdf"
+            if (-not (Test-Path $path)) { "missing $path"; continue }
+            $p = Start-Process -FilePath $edge -ArgumentList "--new-window","--user-data-dir=$env:RUNNER_TEMP\edge-$f","--no-first-run","--start-maximized","file:///$($path -replace '\\','/')" -PassThru
+            Start-Sleep -Seconds 12
+            $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+            $bmp.Save("$PWD\shots\edge-$f.png"); $g.Dispose(); $bmp.Dispose()
+            Get-Process msedge -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 2
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -235,6 +255,7 @@ jobs:
           $dest = "$env:RUNNER_TEMP\ws"
           New-Item -ItemType Directory -Force $dest | Out-Null
           Copy-Item shots\*.png $dest -ErrorAction SilentlyContinue
+          Copy-Item shots\app-output\*.pdf $dest -ErrorAction SilentlyContinue
           Copy-Item samples\*.pdf $dest -ErrorAction SilentlyContinue
           "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
           Set-Location $dest

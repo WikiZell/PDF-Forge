@@ -214,3 +214,102 @@ test("accessibility tree of the real app exposes the expected landmarks and name
     Array.from(document.querySelectorAll("button")).filter((b) => !(b.getAttribute("aria-label") || b.textContent || "").trim()).length);
   expect(unnamed).toBe(0);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Native Windows dialogs, driven with real keystrokes (SendKeys) into the actual dialog windows.
+// ---------------------------------------------------------------------------------------------
+import { execFileSync, spawn as spawnProc } from "node:child_process";
+import { existsSync, readFileSync, statSync, rmSync } from "node:fs";
+
+const HERE = __dirname;
+const OUT = join(SHOTS, "app-output");
+
+/** Types `text` + Enter into whichever native dialog opens within `delayMs`. */
+function typeIntoDialog(text: string, delayMs = 3000) {
+  const keys = text.replace(/[+^%~(){}[\]]/g, (c) => `{${c}}`) + "{ENTER}";
+  spawnProc("pwsh", ["-NoProfile", "-File", join(HERE, "send-keys.ps1"), "-Keys", keys, "-DelayMs", String(delayMs)], { stdio: "ignore" });
+}
+
+test("native Open dialog: open a PDF through the real Windows file dialog", async () => {
+  mkdirSync(OUT, { recursive: true });
+  await page.keyboard.press("Escape");
+  typeIntoDialog(join(SAMPLES, "signed-annot.pdf"));
+  await page.getByRole("button", { name: "Open…" }).click();
+  await expect(page.getByText("signed-annot.pdf").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("/ 2")).toBeVisible();
+  await shot("open-dialog-result");
+});
+
+test("native Save dialog: Fill & Sign writes a signed copy (annotations, then flattened) to a new file", async () => {
+  await page.getByRole("button", { name: "Fill & Sign" }).click();
+  // signature library was cleared by the settings test, so draw a new one
+  await page.getByRole("button", { name: "New…" }).click();
+  const b = (await page.getByLabel(/Signature drawing area/).boundingBox())!;
+  await page.mouse.move(b.x + 30, b.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 120, b.y + 40, { steps: 6 });
+  await page.mouse.move(b.x + 240, b.y + 150, { steps: 6 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Save signature" }).click();
+  await page.getByRole("button", { name: /Place signature/ }).click();
+  const spot = await page.evaluate(() => {
+    for (const el of Array.from(document.querySelectorAll("[data-page]"))) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > 200 && r.top < innerHeight - 100) return { x: Math.max(r.left, 150) + 120, y: Math.max(r.top, 120) + 100 };
+    }
+    return null;
+  });
+  await page.mouse.click(spot!.x, spot!.y);
+  await expect(page.getByText("1 item(s) placed.")).toBeVisible();
+
+  for (const [flatten, name] of [[false, "app-signed-annot.pdf"], [true, "app-signed-flat.pdf"]] as const) {
+    const target = join(OUT, name);
+    rmSync(target, { force: true });
+    const box = page.getByLabel(/Flatten on save/);
+    if (flatten) await box.check(); else await box.uncheck();
+    typeIntoDialog(target);
+    await page.getByRole("button", { name: "Save signed copy…" }).click();
+    await expect(page.getByText(/Saved a signed copy with 1 item/)).toBeVisible({ timeout: 30_000 });
+    expect(existsSync(target), `${name} must exist`).toBe(true);
+    expect(statSync(target).size).toBeGreaterThan(500);
+    expect(readFileSync(target).subarray(0, 5).toString()).toBe("%PDF-");
+  }
+  // the original sample must be untouched
+  expect(readFileSync(join(SAMPLES, "signed-annot.pdf")).length).toBeGreaterThan(0);
+  await shot("save-dialog-result");
+});
+
+test("native Save dialog from the organiser, and multi-file merge dialog", async () => {
+  await page.getByRole("button", { name: "Fill & Sign" }).click(); // leave sign mode
+  await page.getByRole("button", { name: "Organize pages" }).click();
+  const grid = page.getByRole("listbox", { name: /Pages\./ }).getByRole("option");
+  await expect(grid).toHaveCount(2, { timeout: 30_000 }); // signed-annot.pdf has 2 pages
+
+  // merge: add another PDF through the native multi-select dialog
+  typeIntoDialog(join(SAMPLES, "merged.pdf"));
+  await page.getByRole("button", { name: "Add PDFs (merge)…" }).click();
+  await expect(grid).toHaveCount(7, { timeout: 30_000 });
+
+  const target = join(OUT, "app-organized.pdf");
+  rmSync(target, { force: true });
+  typeIntoDialog(target);
+  await page.getByRole("button", { name: "Save a copy…" }).click();
+  await expect(page.getByText(/Saved 7 pages/)).toBeVisible({ timeout: 30_000 });
+  expect(statSync(target).size).toBeGreaterThan(500);
+  await shot("organizer-saved");
+  await page.getByRole("button", { name: "← Back to viewer" }).click();
+});
+
+test("native Print dialog opens from the app and the app stays healthy", async () => {
+  mkdirSync(OUT, { recursive: true });
+  const shotPath = join(SHOTS, "real-print-dialog.png");
+  spawnProc("pwsh", ["-NoProfile", "-File", join(HERE, "desktop-shot.ps1"), "-Path", shotPath, "-DelayMs", "6000"], { stdio: "ignore" });
+  await page.getByRole("button", { name: "Print…" }).click();
+  await page.waitForTimeout(8000);
+  expect(existsSync(shotPath), "desktop screenshot of the print dialog").toBe(true);
+  // close the print dialog and confirm the app is still responsive and showed no error
+  execFileSync("pwsh", ["-NoProfile", "-File", join(HERE, "send-keys.ps1"), "-Keys", "{ESC}", "-DelayMs", "500"]);
+  await page.waitForTimeout(1500);
+  await expect(page.getByRole("button", { name: "Open…" })).toBeVisible();
+  expect(await page.getByRole("alert").count()).toBe(0);
+});
