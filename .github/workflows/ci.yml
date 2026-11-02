@@ -127,6 +127,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
       - uses: actions/download-artifact@v4
         with:
           name: windows-installers
@@ -181,10 +184,17 @@ jobs:
           if (-not $chrome) { $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe" }
           foreach ($f in "merged", "signed-annot", "signed-flat") {
             $url = "file:///" + ("$PWD\samples\$f.pdf" -replace '\\', '/')
-            & $chrome --headless=new --disable-gpu --hide-scrollbars --window-size=900,1100 --virtual-time-budget=8000 "--screenshot=$PWD\shots\chrome-$f.png" $url
-            Start-Sleep -Seconds 3
+            Start-Process -FilePath $chrome -ArgumentList "--headless=new","--disable-gpu","--hide-scrollbars","--window-size=900,1100","--virtual-time-budget=8000","--screenshot=$PWD\shots\chrome-$f.png",$url -Wait
+            Start-Sleep -Seconds 2
           }
           Get-ChildItem shots | Select-Object Name, Length
+      - name: Drive the REAL installed app over WebView2 (CDP) - interactive E2E with the real backend
+        shell: pwsh
+        run: |
+          npx playwright test -c playwright.real.config.ts
+        env:
+          SAMPLES_DIR: ${{ github.workspace }}\samples
+          SHOTS_DIR: ${{ github.workspace }}\shots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
