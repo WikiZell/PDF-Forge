@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    name: Test (Linux: core, frontend, E2E)
+    name: "Test (Linux, core, frontend, E2E)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
