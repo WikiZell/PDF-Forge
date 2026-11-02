@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Linux, core + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Core crates are UI-free, so they build without WebKit.
+      - run: node scripts/fetch-pdfium.mjs linux-x64
+      - name: Rust tests (pdf-core, pdf-render with real PDFium)
+        run: cargo test -p pdf-core -p pdf-render --locked -- --test-threads=1
+        env:
+          PDFIUM_DIR: ${{ github.workspace }}/src-tauri/resources/pdfium
+          PDFIUM_REQUIRED: "1"
+
+  windows:
+    name: Build Windows installers (unsigned)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: node scripts/fetch-pdfium.mjs win-x64
+      - name: Rust tests with real PDFium (Windows)
+        run: cargo test -p pdf-core -p pdf-render --locked -- --test-threads=1
+        env:
+          PDFIUM_DIR: ${{ github.workspace }}\src-tauri\resources\pdfium
+          PDFIUM_REQUIRED: "1"
+      - name: Build MSI + NSIS
+        run: npx tauri build
+        env:
+          # Authenticode hook: set repo secrets and flip SIGN_WINDOWS to "true" once a certificate exists.
+          # Signing config (certificateThumbprint / signCommand) goes in tauri.conf.json bundle.windows.
+          SIGN_WINDOWS: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+          if-no-files-found: error

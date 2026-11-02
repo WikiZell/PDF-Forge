@@ -1,0 +1,21 @@
+[package]
+name = "pdf-forge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Offline, privacy-first PDF reader and editor"
+
+[lib]
+name = "pdf_forge_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+pdf-core = { path = "../crates/pdf-core" }
+pdf-render = { path = "../crates/pdf-render" }
+tauri = { version = "=2.12.5", features = [] }
+tauri-plugin-dialog = "=2.8.4"
+serde = { version = "1", features = ["derive"] }

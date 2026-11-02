@@ -1,0 +1,3 @@
+/gen/
+/resources/pdfium/*
+!/resources/pdfium/.gitkeep
