@@ -188,6 +188,22 @@ jobs:
             Start-Sleep -Seconds 2
           }
           Get-ChildItem shots | Select-Object Name, Length
+      - name: Diagnose WebView2 remote-debugging port (for the real-app E2E)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9444 --remote-allow-origins=*"
+          $p = Start-Process -FilePath $env:APP_EXE -ArgumentList "`"$PWD\samples\merged.pdf`"" -PassThru
+          Start-Sleep -Seconds 20
+          "app alive: $(-not $p.HasExited)"
+          "--- webview2 processes"
+          Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Select-Object -First 3 -ExpandProperty CommandLine
+          "--- listening ports"
+          netstat -ano | Select-String "LISTENING" | Select-String "9444|9333|127.0.0.1"
+          "--- /json/version"
+          try { (Invoke-WebRequest http://127.0.0.1:9444/json/version -UseBasicParsing -TimeoutSec 5).Content } catch { "ERR: $_" }
+          Stop-Process -Id $p.Id -Force
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Drive the REAL installed app over WebView2 (CDP) - interactive E2E with the real backend
         shell: pwsh
         run: |

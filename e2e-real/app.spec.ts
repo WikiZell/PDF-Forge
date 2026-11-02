@@ -13,7 +13,7 @@ let browser: Browser;
 let page: Page;
 
 async function waitForCdp() {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     try {
       const r = await fetch(`http://127.0.0.1:${PORT}/json/version`);
       if (r.ok) return;
@@ -24,9 +24,10 @@ async function waitForCdp() {
 }
 
 test.beforeAll(async () => {
+  test.setTimeout(150_000);
   mkdirSync(SHOTS, { recursive: true });
   proc = spawn(APP, [join(SAMPLES, "merged.pdf")], {
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
+    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT} --remote-allow-origins=*` },
     stdio: "ignore",
   });
   await waitForCdp();
