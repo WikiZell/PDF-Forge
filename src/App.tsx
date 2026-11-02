@@ -45,6 +45,8 @@ export function App() {
       if (prev) closePdf(prev.id).catch(() => {});
       s.setPendingPassword(null);
       setWrongPw(false);
+      // placements belong to the document they were made on; never carry them over to another file
+      if (prev?.path !== doc.path) useSign.getState().reset();
       s.setDoc(doc);
       s.setSizes(sizes);
     } catch (e) {

@@ -74,6 +74,22 @@ test.describe("fill & sign", () => {
     expect(sd.args.placements.every((p: any) => p.page === 0 && p.w > 0 && p.h > 0)).toBe(true);
   });
 
+  test("placements never carry over to another document", async ({ page }) => {
+    await page.getByRole("button", { name: "Text", exact: true }).click();
+    const tb = (await page.getByRole("img", { name: "Page 1", exact: true }).boundingBox())!;
+    await page.mouse.click(tb.x + 60, tb.y + 60);
+    await expect(page.getByText("1 item(s) placed.")).toBeVisible();
+    // open a different document (the mock returns a new path for the second open)
+    await page.evaluate(() => {
+      const i = (window as any).__TAURI_INTERNALS__;
+      const orig = i.invoke;
+      i.invoke = async (cmd: string, args: any) => (cmd === "open_pdf" ? orig(cmd, { ...args, path: "/mock/other.pdf" }) : orig(cmd, args));
+    });
+    await page.getByRole("button", { name: "Open…" }).click();
+    await expect(page.getByText("0 item(s) placed.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save signed copy…" })).toBeDisabled();
+  });
+
   test("Escape disarms a tool; save is disabled with nothing placed", async ({ page }) => {
     await expect(page.getByRole("button", { name: "Save signed copy…" })).toBeDisabled();
     await page.getByRole("button", { name: "Date", exact: true }).click();

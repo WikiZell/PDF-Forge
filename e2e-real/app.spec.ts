@@ -241,8 +241,14 @@ test("native Open dialog: open a PDF through the real Windows file dialog", asyn
   await shot("open-dialog-result");
 });
 
+/** Fill & Sign is a toggle that survives between tests, so set it explicitly. */
+async function signMode(on: boolean) {
+  const open = await page.getByRole("complementary", { name: "Fill and sign" }).isVisible();
+  if (open !== on) await page.getByRole("button", { name: "Fill & Sign" }).click();
+}
+
 test("native Save dialog: Fill & Sign writes a signed copy (annotations, then flattened) to a new file", async () => {
-  await page.getByRole("button", { name: "Fill & Sign" }).click();
+  await signMode(true);
   // signature library was cleared by the settings test, so draw a new one
   await page.getByRole("button", { name: "New…" }).click();
   const b = (await page.getByLabel(/Signature drawing area/).boundingBox())!;
@@ -281,7 +287,7 @@ test("native Save dialog: Fill & Sign writes a signed copy (annotations, then fl
 });
 
 test("native Save dialog from the organiser, and multi-file merge dialog", async () => {
-  await page.getByRole("button", { name: "Fill & Sign" }).click(); // leave sign mode
+  await signMode(false);
   await page.getByRole("button", { name: "Organize pages" }).click();
   const grid = page.getByRole("listbox", { name: /Pages\./ }).getByRole("option");
   await expect(grid).toHaveCount(2, { timeout: 30_000 }); // signed-annot.pdf has 2 pages
