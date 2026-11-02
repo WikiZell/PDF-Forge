@@ -90,10 +90,16 @@ shortcut ("Open…, Control+O"), toggle states ("Fill & Sign toggle button not p
 "invalid entry" because `step=5` made values like 181 or 217 invalid; fixed (`step=1`). This is NVDA
 driven by a script, not a blind or low-vision person using the app.
 
-**Still not done:** a person using a screen reader; a clean full-page Acrobat rendering (the first-run
-"make Acrobat your default?" prompt still covered the page in run 41534422260; the next run clicks "No"
-through UI Automation, result to be recorded); signing the installers (unsigned; SmartScreen will warn -
-needs an Authenticode certificate, the CI hook is in place); macOS/Linux builds (not wired by design).
+**Acrobat re-run (run 41538016995, commit 3048736):** the UI Automation click on "No" did not dismiss the
+"make Acrobat your default?" prompt (Acrobat's window is not reachable that way on the runner), so a clean
+full-page Acrobat screenshot was **not** obtained. What Acrobat does show behind the dimmed prompt is
+consistent across both runs: the stamp image and ink stroke on page 1 and "Comments 5" (annotated copy) vs
+"Comments 4" (flattened copy). Clean full-page renderings of the same files exist from Edge's PDF viewer and
+Chrome (both PDFium). I am not pursuing this further in CI.
+
+**Still not done:** a person using a screen reader; a clean full-page Acrobat screenshot (see above);
+signing the installers (unsigned; SmartScreen will warn - needs an Authenticode certificate, the CI hook is in
+place); OCR for scans (not in the spec); macOS/Linux builds (not wired by design).
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
