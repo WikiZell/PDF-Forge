@@ -6,7 +6,7 @@ import { join } from "node:path";
 const APP = process.env.APP_EXE!;
 const SAMPLES = process.env.SAMPLES_DIR!;
 const SHOTS = process.env.SHOTS_DIR ?? "shots";
-const PORT = 9333;
+const PORT = 9444; // enabled for pdf-forge.exe by the CI step that writes the WebView2 policy registry value
 
 let proc: ChildProcess;
 let browser: Browser;
@@ -27,7 +27,6 @@ test.beforeAll(async () => {
   test.setTimeout(150_000);
   mkdirSync(SHOTS, { recursive: true });
   proc = spawn(APP, [join(SAMPLES, "merged.pdf")], {
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT} --remote-allow-origins=*` },
     stdio: "ignore",
   });
   await waitForCdp();

@@ -188,11 +188,20 @@ jobs:
             Start-Sleep -Seconds 2
           }
           Get-ChildItem shots | Select-Object Name, Length
+      - name: Enable WebView2 remote debugging for pdf-forge.exe (CI runner only; product is unchanged)
+        shell: pwsh
+        run: |
+          # The WebView2 policy registry value overrides the app's own browser arguments (env var does not).
+          foreach ($root in "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments", "HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments") {
+            New-Item -Path $root -Force | Out-Null
+            New-ItemProperty -Path $root -Name "*" -Value "--remote-debugging-port=9444 --remote-allow-origins=*" -PropertyType String -Force | Out-Null
+            New-ItemProperty -Path $root -Name "pdf-forge.exe" -Value "--remote-debugging-port=9444 --remote-allow-origins=*" -PropertyType String -Force | Out-Null
+          }
+          Get-ItemProperty "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments" | Format-List
       - name: Diagnose WebView2 remote-debugging port (for the real-app E2E)
         shell: pwsh
         continue-on-error: true
         run: |
-          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9444 --remote-allow-origins=*"
           $p = Start-Process -FilePath $env:APP_EXE -ArgumentList "`"$PWD\samples\merged.pdf`"" -PassThru
           Start-Sleep -Seconds 20
           "app alive: $(-not $p.HasExited)"
