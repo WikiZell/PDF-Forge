@@ -11,7 +11,7 @@ zoom. Everything else in the spec comes in later milestones.
 - The frontend never supplies trusted paths. Files are granted in Rust (native dialog, OS drag-and-drop,
   CLI argument) and every command re-checks the path against that allow-list (`pdf-core::AllowedPaths`).
 - Size limit (default 2 GB) and page limit (default 100,000) apply to every opened file.
-- PDF JavaScript and XFA are not compiled into PDFium use (`pdfium-render` features `pdfium_enable_v8`/`xfa` are off).
+- PDF JavaScript and XFA are disabled: the `pdfium-render` features `pdfium_enable_v8` and `pdfium_enable_xfa` are off, and the bundled PDFium build has no V8.
 - Passwords are used for the single `open_pdf` call and never stored.
 - Input files are opened read-only; nothing writes to the original.
 
