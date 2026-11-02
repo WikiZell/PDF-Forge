@@ -220,7 +220,7 @@ test("accessibility tree of the real app exposes the expected landmarks and name
 // Native Windows dialogs, driven with real keystrokes (SendKeys) into the actual dialog windows.
 // ---------------------------------------------------------------------------------------------
 import { execFileSync, spawn as spawnProc } from "node:child_process";
-import { existsSync, readFileSync, statSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, rmSync } from "node:fs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(SHOTS, "app-output");
@@ -321,4 +321,138 @@ test("native Print dialog opens from the app and the app stays healthy", async (
   await page.waitForTimeout(1500);
   await expect(page.getByRole("button", { name: "Open…" })).toBeVisible();
   expect(await page.getByRole("alert").count()).toBe(0);
+});
+
+
+// ---------------------------------------------------------------------------------------------
+// Screen-reader surface: the Windows UI Automation tree
+// ---------------------------------------------------------------------------------------------
+test("UI Automation tree (what Narrator/NVDA read) exposes the app's controls with names and roles", async () => {
+  await expect(page.getByRole("button", { name: "Open…" })).toBeVisible();
+  let out = "";
+  for (let attempt = 0; attempt < 3 && !out.includes("Organize pages"); attempt++) {
+    out = execFileSync("pwsh", ["-NoProfile", "-File", join(HERE, "uia-dump.ps1")], { encoding: "utf8", timeout: 120_000 });
+  }
+  mkdirSync(SHOTS, { recursive: true });
+  writeFileSync(join(SHOTS, "real-uia-tree.txt"), out);
+  expect(out, "UIA tree should contain the window").not.toContain("NO WINDOW");
+  for (const name of ["Open…", "Organize pages", "Fill & Sign", "Bulk sign…", "Settings", "Find", "Print…"]) {
+    expect(out, `UIA should expose a control named "${name}"`).toMatch(new RegExp(`Button \\| ${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  }
+  expect(out).toMatch(/Tab(Item)? \| (Pages|Bookmarks|Search)/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Bulk signing through the real window with the native folder pickers
+// ---------------------------------------------------------------------------------------------
+test("bulk signing through the real window: native folder pickers, preview, run, outputs on disk", async () => {
+  test.setTimeout(240_000);
+  const input = join(SAMPLES, "bulk-in");
+  const output = join(OUT, "bulk-out");
+  rmSync(output, { recursive: true, force: true });
+  mkdirSync(output, { recursive: true });
+  const originals = ["contract_a.pdf", "contract_b.pdf", "contract_c.pdf", "no_anchor.pdf", "broken.pdf"].map((n) => [n, readFileSync(join(input, n))] as const);
+
+  await page.getByRole("button", { name: "Bulk sign…" }).click();
+  typeIntoDialog(input, 3500);
+  await page.getByRole("button", { name: "Add folder…" }).click();
+  await expect(page.getByText("5 file(s) selected")).toBeVisible({ timeout: 40_000 });
+  typeIntoDialog(output, 3500);
+  await page.getByRole("button", { name: "Choose output folder…" }).click();
+  await expect(page.getByText(output.replace(/\\/g, "\\")).first()).toBeVisible({ timeout: 40_000 });
+
+  // a signature from the library (drawn earlier through the real UI) is selected by default
+  await page.getByRole("button", { name: "Preview rule" }).click();
+  await expect(page.getByText("Would sign 3, skip 1, fail 1.")).toBeVisible({ timeout: 60_000 });
+  await shot("bulk-preview");
+
+  await page.getByRole("button", { name: /Run on 5 file/ }).click();
+  await expect(page.getByText(/5 of 5 processed — finished/)).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("3 signed, 1 skipped, 1 failed")).toBeVisible();
+  await shot("bulk-done");
+
+  const outs = readdirSync(output).sort();
+  expect(outs.filter((f) => f.endsWith("_signed.pdf"))).toEqual(["contract_a_signed.pdf", "contract_b_signed.pdf", "contract_c_signed.pdf"]);
+  const csv = outs.find((f) => f.startsWith("signing-report") && f.endsWith(".csv"));
+  expect(csv, "CSV report written next to the outputs").toBeTruthy();
+  const rows = readFileSync(join(output, csv!), "utf8");
+  expect(rows).toContain(",skipped,");
+  expect(rows).toContain(",failed,");
+  for (const f of outs.filter((f) => f.endsWith("_signed.pdf"))) {
+    expect(readFileSync(join(output, f)).subarray(0, 5).toString()).toBe("%PDF-");
+    expect(statSync(join(output, f)).size).toBeGreaterThan(800);
+  }
+  for (const [n, bytes] of originals) expect(readFileSync(join(input, n)).equals(bytes), `${n} must be untouched`).toBe(true);
+  await page.getByRole("button", { name: "← Back" }).click();
+});
+
+// ---------------------------------------------------------------------------------------------
+// A heavy 1,000-page scanned-style document (JPEG page images, ~137 MB)
+// ---------------------------------------------------------------------------------------------
+test("1,000-page scanned document: open, jump, render, organiser output build, memory", async () => {
+  test.setTimeout(420_000);
+  const scan = join(SAMPLES, "scan-1000.pdf");
+  test.skip(!existsSync(scan), "scan-1000.pdf was not generated");
+  const mb = statSync(scan).size / 1e6;
+  const t: Record<string, number | string> = { fileMB: Math.round(mb) };
+  const ws = () => {
+    const o = execFileSync("pwsh", ["-NoProfile", "-Command", "(Get-Process pdf-forge | Measure-Object WorkingSet64 -Sum).Sum / 1MB"], { encoding: "utf8" });
+    return Math.round(Number(o.trim()));
+  };
+  t.memBeforeMB = ws();
+
+  let t0 = Date.now();
+  typeIntoDialog(scan, 3500);
+  await page.getByRole("button", { name: "Open…" }).click();
+  await expect(page.getByText("/ 1000")).toBeVisible({ timeout: 120_000 });
+  t.openMs = Date.now() - t0;
+  await expect(page.locator('[data-page="0"] img').first()).toBeVisible({ timeout: 60_000 });
+  t.firstPageMs = Date.now() - t0;
+
+  t0 = Date.now();
+  await page.getByLabel("Page number").fill("500");
+  await expect(page.locator('[data-page="499"] img').first()).toBeVisible({ timeout: 60_000 });
+  const w = await page.locator('[data-page="499"] img').first().evaluate((i: HTMLImageElement) => i.naturalWidth);
+  expect(w).toBeGreaterThan(100);
+  t.jumpToPage500Ms = Date.now() - t0;
+
+  // fast scrolling must stay responsive
+  t0 = Date.now();
+  for (const p of [900, 100, 750, 1000, 1]) {
+    await page.getByLabel("Page number").fill(String(p));
+    await expect(page.locator(`[data-page="${p - 1}"] img`).first()).toBeVisible({ timeout: 60_000 });
+  }
+  t.fiveJumpsMs = Date.now() - t0;
+  t.memAfterViewMB = ws();
+
+  // search across all 1,000 pages (image-only pages: must finish promptly and report no matches)
+  t0 = Date.now();
+  await page.keyboard.press("Control+f");
+  await page.getByLabel("Search text").fill("zzzz");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("No matches.")).toBeVisible({ timeout: 120_000 });
+  t.searchMs = Date.now() - t0;
+
+  // organiser: rotate some pages and build the 1,000-page output
+  await page.getByRole("button", { name: "Organize pages" }).click();
+  const grid = page.getByRole("listbox", { name: /Pages\./ }).getByRole("option");
+  t0 = Date.now();
+  await expect(grid).toHaveCount(1000, { timeout: 180_000 });
+  t.organizerLoadMs = Date.now() - t0;
+  await grid.nth(0).click();
+  await page.getByRole("button", { name: "Rotate ⟳" }).click();
+  await grid.nth(999).click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  t0 = Date.now();
+  await page.getByRole("button", { name: "Preview output" }).click();
+  await expect(page.getByText(/Output: 999 pages, [\d.]+ MB/)).toBeVisible({ timeout: 300_000 });
+  t.buildOutputMs = Date.now() - t0;
+  t.memAfterOrganizerMB = ws();
+  await shot("scan-organizer");
+  await page.getByRole("button", { name: "← Back to viewer" }).click();
+
+  writeFileSync(join(SHOTS, "real-scan-1000-metrics.json"), JSON.stringify(t, null, 2));
+  console.log("SCAN METRICS", JSON.stringify(t));
+  expect(Number(t.memAfterOrganizerMB), "memory stays bounded").toBeLessThan(2500);
+  expect(Number(t.openMs), "open time").toBeLessThan(60_000);
 });

@@ -138,8 +138,10 @@ jobs:
         shell: pwsh
         run: |
           $env:SAMPLES_DIR = "$PWD\samples"
-          cargo test -p pdf-core --test sample_outputs --locked
-          Get-ChildItem samples
+          $env:SCAN_PAGES = "1000"
+          # release build: JPEG-encoding 1,000 page images is too slow unoptimised
+          cargo test --release -p pdf-core --test sample_outputs --locked
+          Get-ChildItem samples -Recurse | Select-Object FullName, Length
       - name: Silent per-user install (no admin)
         shell: pwsh
         run: |
@@ -247,6 +249,35 @@ jobs:
             Get-Process msedge -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 2
           }
+      - name: Try Adobe Acrobat Reader (install via Chocolatey, open the app's saved files)
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          choco install adobereader -y --no-progress --params '"/UpdateMode:0"' 2>&1 | Select-Object -Last 15
+          $reader = Get-ChildItem "C:\Program Files*\Adobe\Acrobat Reader*\Reader\AcroRd32.exe", "C:\Program Files*\Adobe\Acrobat DC\Acrobat\Acrobat.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $reader) { "Acrobat Reader executable not found"; exit 0 }
+          "Acrobat Reader at $($reader.FullName)"
+          # accept the first-run licence / disable prompts so the document window is reachable
+          foreach ($k in "HKCU:\Software\Adobe\Acrobat Reader\DC\AdobeViewer", "HKLM:\SOFTWARE\Adobe\Acrobat Reader\DC\AdobeViewer") {
+            New-Item -Path $k -Force -ErrorAction SilentlyContinue | Out-Null
+            New-ItemProperty -Path $k -Name EULA -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+          }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          foreach ($f in "app-signed-annot", "app-signed-flat", "app-organized") {
+            $path = "$PWD\shots\app-output\$f.pdf"
+            if (-not (Test-Path $path)) { "missing $path"; continue }
+            $p = Start-Process -FilePath $reader.FullName -ArgumentList "`"$path`"" -PassThru
+            Start-Sleep -Seconds 30
+            $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+            $bmp.Save("$PWD\shots\acrobat-$f.png"); $g.Dispose(); $bmp.Dispose()
+            Get-Process AcroRd32, Acrobat, AcroCEF -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 3
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -261,7 +292,7 @@ jobs:
         run: |
           $dest = "$env:RUNNER_TEMP\ws"
           New-Item -ItemType Directory -Force $dest | Out-Null
-          Copy-Item shots\*.png $dest -ErrorAction SilentlyContinue
+          Copy-Item shots\*.png, shots\*.txt, shots\*.json $dest -ErrorAction SilentlyContinue
           Copy-Item shots\app-output\*.pdf $dest -ErrorAction SilentlyContinue
           Copy-Item samples\*.pdf $dest -ErrorAction SilentlyContinue
           "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
@@ -272,5 +303,84 @@ jobs:
           git add -A
           git commit -q -m "Windows smoke screenshots from $env:GITHUB_SHA"
           git push -f "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" windows-smoke
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows-msi:
+    name: Windows MSI (install, launch, uninstall)
+    needs: windows
+    runs-on: windows-latest
+    permissions:
+      contents: write   # only to publish a screenshot to the `windows-msi` branch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          path: installers
+      - name: Silent MSI install
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem -Recurse installers -Filter *.msi | Select-Object -First 1).FullName
+          $p = Start-Process msiexec.exe -ArgumentList "/i","`"$msi`"","/qn","/norestart","/L*v","$PWD\msi-install.log" -Wait -PassThru
+          "msiexec install exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { Get-Content msi-install.log -Tail 60; exit 1 }
+          $exe = Get-ChildItem "C:\Program Files\PDF Forge\pdf-forge.exe", "$env:LOCALAPPDATA\Programs\PDF Forge\pdf-forge.exe", "C:\Program Files (x86)\PDF Forge\pdf-forge.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { Get-ChildItem "C:\Program Files" -Recurse -Filter pdf-forge.exe -ErrorAction SilentlyContinue | Select-Object FullName; Write-Error "installed exe not found"; exit 1 }
+          "installed at $($exe.FullName)"
+          "MSI_EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Get-ChildItem (Split-Path $exe.FullName) -Recurse | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 200
+      - name: Launch the MSI-installed app on a PDF and screenshot it
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force shots | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $pdf = "$PWD\tests\fixtures\text-3page-outline.pdf"
+          $p = Start-Process -FilePath $env:MSI_EXE -ArgumentList "`"$pdf`"" -PassThru
+          Start-Sleep -Seconds 15
+          $p.Refresh()
+          "exited=$($p.HasExited) title='$($p.MainWindowTitle)'"
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+          $bmp.Save("$PWD\shots\msi-installed-app.png"); $g.Dispose(); $bmp.Dispose()
+          if ($p.HasExited) { Write-Error "MSI-installed app exited early (code $($p.ExitCode))"; exit 1 }
+          if ($p.MainWindowTitle -notlike "PDF Forge*") { Write-Error "unexpected window title"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
+      - name: Uninstall the MSI and verify it is gone
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem -Recurse installers -Filter *.msi | Select-Object -First 1).FullName
+          Start-Sleep -Seconds 3
+          $p = Start-Process msiexec.exe -ArgumentList "/x","`"$msi`"","/qn","/norestart" -Wait -PassThru
+          "msiexec uninstall exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if (Test-Path $env:MSI_EXE) { Write-Error "app still present after uninstall"; exit 1 }
+          "uninstalled cleanly"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-msi-evidence
+          path: |
+            shots/*.png
+            msi-install.log
+          if-no-files-found: warn
+      - name: Publish the screenshot to the windows-msi branch
+        if: always() && github.ref_type == 'branch' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $dest = "$env:RUNNER_TEMP\wm"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item shots\*.png $dest -ErrorAction SilentlyContinue
+          "from $env:GITHUB_SHA on $(Get-Date -Format u)" | Out-File "$dest\INFO.txt" -Encoding utf8
+          Set-Location $dest
+          git init -q -b windows-msi
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "MSI smoke screenshot from $env:GITHUB_SHA"
+          git push -f "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" windows-msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
