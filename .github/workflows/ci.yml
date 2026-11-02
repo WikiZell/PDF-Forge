@@ -51,6 +51,9 @@ jobs:
           npm run build
           cargo clippy -p pdf-core -p pdf-render -p pdf-forge --locked -- -D warnings
           cargo test -p pdf-forge --locked
+        env:
+          PDFIUM_DIR: ${{ github.workspace }}/src-tauri/resources/pdfium
+          PDFIUM_REQUIRED: "1"
 
   fuzz:
     name: Fuzz (short run)

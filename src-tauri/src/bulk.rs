@@ -478,8 +478,8 @@ struct FinishedEvent {
 
 /// Start a bulk job in the background. Progress and completion arrive as events.
 #[tauri::command]
-pub async fn bulk_run(
-    app: AppHandle,
+pub async fn bulk_run<R: tauri::Runtime>(
+    app: AppHandle<R>,
     rule: RuleFile,
     files: Vec<String>,
     workers: usize,
@@ -640,5 +640,115 @@ mod tests {
         assert_eq!(civil_from_days(19_723), Date { year: 2024, month: 1, day: 1 });
         assert_eq!(civil_from_days(20_572), Date { year: 2026, month: 4, day: 29 });
         assert_eq!(civil_from_days(11_016), Date { year: 2000, month: 2, day: 29 });
+    }
+
+    /// Drives the real `bulk_run` command through Tauri's mock runtime and checks that the
+    /// progress and finished events reach a listener, with real PDFium anchor search.
+    #[test]
+    fn bulk_run_emits_progress_then_finished_events() {
+        use std::sync::mpsc;
+        use tauri::{
+            test::{get_ipc_response, mock_builder, mock_context, noop_assets},
+            webview::InvokeRequest,
+            Listener, WebviewWindowBuilder,
+        };
+
+        let Some(dir) = std::env::var_os("PDFIUM_DIR") else {
+            if std::env::var_os("PDFIUM_REQUIRED").is_some() {
+                panic!("PDFIUM_DIR not set");
+            }
+            eprintln!("skipping: no PDFium");
+            return;
+        };
+        pdf_render::init(Path::new(&dir)).expect("pdfium");
+
+        let root = std::env::temp_dir().join(format!("bulk-events-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (inp, out, data) = (root.join("in"), root.join("out"), root.join("data"));
+        for d in [&inp, &out, &data.join("signatures")] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+        std::fs::write(
+            data.join("signatures/index.json"),
+            br#"[{"id":"abc123","name":"t","kind":"drawn","created":0,"aspect":3.0,"drawn":{"strokes":[[[0,0,0.5],[30,10,0.5]]],"view":[30,10],"width":2,"color":[0,0,0]}}]"#,
+        ).unwrap();
+        let pdf = |text: &str| {
+            format!("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 400]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 60>>stream\nBT /F1 14 Tf 20 100 Td ({text}) Tj ET\nendstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R/Size 6>>\n%%EOF\n")
+        };
+        let files: Vec<String> =
+            [("a.pdf", "Signature: ____"), ("b.pdf", "nothing here"), ("c.pdf", "Signature: ____")]
+                .iter()
+                .map(|(n, t)| {
+                    let p = inp.join(n);
+                    std::fs::write(&p, pdf(t)).unwrap();
+                    p.to_string_lossy().into_owned()
+                })
+                .collect();
+
+        let state =
+            AppState::new(pdf_core::AllowedPaths::new(Some(data.clone())), crate::storage::Storage::new(data.clone()));
+        for f in &files {
+            state.allowed.grant(Path::new(f)).unwrap();
+        }
+        let app = mock_builder()
+            .manage(state)
+            .manage(BulkState::default())
+            .invoke_handler(tauri::generate_handler![bulk_run])
+            .build(mock_context(noop_assets()))
+            .unwrap();
+        *app.state::<BulkState>().out_dir.lock().unwrap() = Some(out.canonicalize().unwrap());
+        let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().unwrap();
+
+        let (tx, rx) = mpsc::channel::<(String, String)>();
+        for name in ["bulk-progress", "bulk-finished"] {
+            let tx = tx.clone();
+            app.listen(name, move |e| {
+                let _ = tx.send((name.to_string(), e.payload().to_string()));
+            });
+        }
+        let rule = serde_json::json!({
+            "version": 1, "signature": "abc123", "width": 100, "height": 40, "pages": "last",
+            "position": {"type": "anchor", "text": "Signature:", "side": "right", "offsetX": 5}, "flatten": false
+        });
+        let res = get_ipc_response(
+            &webview,
+            InvokeRequest {
+                cmd: "bulk_run".into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: "tauri://localhost".parse().unwrap(),
+                body: tauri::ipc::InvokeBody::Json(serde_json::json!({
+                    "rule": rule, "files": files, "workers": 2, "today": {"year": 2026, "month": 11, "day": 2}
+                })),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        );
+        assert!(res.is_ok(), "bulk_run returned {res:?}");
+
+        let mut progress = Vec::new();
+        let finished = loop {
+            let (name, payload) = rx.recv_timeout(std::time::Duration::from_secs(30)).expect("events arrive");
+            let v: serde_json::Value = serde_json::from_str(&payload).unwrap();
+            if name == "bulk-finished" {
+                break v;
+            }
+            progress.push(v);
+        };
+        assert_eq!(progress.len(), 3, "one progress event per file");
+        assert_eq!(progress.iter().map(|p| p["done"].as_u64().unwrap()).max(), Some(3));
+        assert!(progress.iter().all(|p| p["total"] == 3 && p["jobId"] == finished["jobId"]));
+        let statuses: Vec<&str> =
+            finished["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
+        assert_eq!(statuses, ["signed", "skipped", "signed"]);
+        assert!(finished["items"][1]["detail"].as_str().unwrap().contains("not found"));
+        assert_eq!(finished["cancelled"], false);
+        let report = finished["reportPath"].as_str().expect("report path");
+        assert!(std::fs::read_to_string(report).unwrap().contains(",skipped,"));
+        assert!(
+            out.join("a_signed.pdf").exists()
+                && out.join("c_signed.pdf").exists()
+                && !out.join("b_signed.pdf").exists()
+        );
     }
 }

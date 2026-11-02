@@ -68,8 +68,11 @@ byte-identical, anchor placement relative to found text, first/last/all pages, d
 never-overwrite (including parallel same-name files), cancel, corrupt/empty/missing/encrypted/short
 files reported per file, CSV injection guard, rule validation.
 Observed: UI renders; add-folder reported a clear error on an invalid selection.
-**Not verified:** the progress/finished *events* in the real window (GTK dialog automation was
-unreliable; the E2E mock covers the UI side only).
+Verified: the real `bulk_run` command driven through Tauri's mock runtime with real PDFium emits one
+`bulk-progress` event per file then `bulk-finished` (statuses signed/skipped/signed, CSV report written,
+right outputs on disk) — `bulk::tests::bulk_run_emits_progress_then_finished_events`. The event→UI
+side is covered by the mocked Playwright flow. Not seen: the same thing in a real window (GTK dialog
+automation was unreliable).
 
 ## 7. Hardening
 Done: configurable limits, render/open timeouts, panic containment, fuzz harness (run, bug fixed), licence inventory
