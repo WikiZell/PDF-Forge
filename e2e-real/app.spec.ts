@@ -45,6 +45,27 @@ test.afterAll(async () => {
   proc?.kill();
 });
 
+test.afterEach(async ({}, info) => {
+  if (info.status !== info.expectedStatus) {
+    const n = info.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
+    await page.screenshot({ path: join(SHOTS, `real-FAIL-${n}.png`) }).catch(() => {});
+    const dom = await page
+      .evaluate(() => ({
+        armedHint: document.body.innerText.includes("Click on the page to place"),
+        signLayers: document.querySelectorAll("[data-sign-layer]").length,
+        placed: (document.body.innerText.match(/\d+ item\(s\) placed/) || [""])[0],
+        pages: Array.from(document.querySelectorAll("[data-page]")).slice(0, 3).map((e) => {
+          const r = e.getBoundingClientRect();
+          return { page: e.getAttribute("data-page"), x: r.x, y: r.y, w: r.width, h: r.height };
+        }),
+        viewport: { w: innerWidth, h: innerHeight },
+      }))
+      .catch((e) => ({ error: String(e) }));
+    writeFileSync(join(SHOTS, `real-FAIL-${n}.json`), JSON.stringify(dom, null, 2));
+    console.log("FAIL DIAG", info.title, JSON.stringify(dom));
+  }
+});
+
 const shot = (name: string) => page.screenshot({ path: join(SHOTS, `real-${name}.png`) });
 
 test("opened from the command line: 5 pages, thumbnails and the page bitmap really rendered", async () => {
@@ -117,6 +138,7 @@ test("Fill & Sign on the real backend: draw a signature, it is stored, place it,
   await expect(place).toBeVisible({ timeout: 15_000 });
 
   await place.click();
+  await expect(page.getByText("Click on the page to place")).toBeVisible(); // armed
   const target = page.locator('[data-page="0"]').first();
   const tb = (await target.boundingBox())!;
   await page.mouse.click(tb.x + tb.width / 2, tb.y + Math.min(tb.height / 2, 200));
@@ -146,7 +168,7 @@ test("Fill & Sign on the real backend: draw a signature, it is stored, place it,
 test("layout holds at 100/125/150/200 % display scaling (no clipping, no horizontal scroll)", async () => {
   const cdp = await page.context().newCDPSession(page);
   for (const scale of [1, 1.25, 1.5, 2]) {
-    await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1280 / scale, height: 800 / scale, deviceScaleFactor: scale, mobile: false });
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: Math.round(1280 / scale), height: Math.round(800 / scale), deviceScaleFactor: scale, mobile: false });
     await page.waitForTimeout(600);
     const m = await page.evaluate(() => ({
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
