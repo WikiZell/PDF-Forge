@@ -409,7 +409,7 @@ pub async fn org_save_as(
         let n = subset.as_ref().map_or(g.project.pages.len(), Vec::len);
         let (bytes, rep) = build_bytes(&g, subset.as_deref())?;
         pdf_core::atomic_write(&path, &bytes, true).map_err(|e| AppError::new("save_failed", e.to_string()))?;
-        Ok(Saved { path: path.to_string_lossy().into_owned(), preview: to_preview(n, bytes.len(), rep) })
+        Ok(Saved { path: pdf_core::display_path(&path), preview: to_preview(n, bytes.len(), rep) })
     })
     .await?;
     // The user chose this path, so it may be opened later.
@@ -433,7 +433,7 @@ pub async fn org_save_over(session: u64, state: State<'_, AppState>) -> Result<S
         let n = g.project.pages.len();
         let (bytes, rep) = build_bytes(&g, None)?;
         pdf_core::atomic_write(&primary, &bytes, true).map_err(|e| AppError::new("save_failed", e.to_string()))?;
-        Ok(Saved { path: primary.to_string_lossy().into_owned(), preview: to_preview(n, bytes.len(), rep) })
+        Ok(Saved { path: pdf_core::display_path(&primary), preview: to_preview(n, bytes.len(), rep) })
     })
     .await
 }
@@ -503,9 +503,9 @@ pub async fn org_split(
             let label = format!("_{:03}_{}", i + 1, pdf_core::sanitize_file_name(&part.label));
             let out = pdf_core::unique_output_path(&dir, &stem, &label, "pdf");
             pdf_core::atomic_write(&out, &bytes, false).map_err(|e| AppError::new("save_failed", e.to_string()))?;
-            files.push(out.to_string_lossy().into_owned());
+            files.push(pdf_core::display_path(&out));
         }
-        Ok(SplitResult { folder: dir.to_string_lossy().into_owned(), files })
+        Ok(SplitResult { folder: pdf_core::display_path(&dir), files })
     })
     .await
     .map(Some)
@@ -523,7 +523,7 @@ pub async fn pick_pdfs(app: AppHandle, state: State<'_, AppState>) -> Result<Vec
     let mut out = Vec::new();
     for fp in picked {
         if let Ok(p) = fp.into_path() {
-            out.push(state.allowed.grant(&p)?.to_string_lossy().into_owned());
+            out.push(pdf_core::display_path(&state.allowed.grant(&p)?));
         }
     }
     Ok(out)

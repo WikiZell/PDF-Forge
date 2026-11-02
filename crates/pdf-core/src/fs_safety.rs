@@ -83,6 +83,21 @@ impl AllowedPaths {
     }
 }
 
+/// A path as a user should see it. On Windows `canonicalize` yields the "verbatim" form
+/// (`\\?\C:\dir`, `\\?\UNC\server\share`), which is correct internally but ugly in the UI and not what
+/// users type; this strips the prefix. Other paths are returned unchanged. It is only for display and
+/// round-trips safely because paths are re-canonicalised (and re-checked) whenever they come back.
+pub fn display_path(p: &Path) -> String {
+    let s = p.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = s.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        s.into_owned()
+    }
+}
+
 /// Make a string safe to use as a single file-name component on Windows, macOS and Linux.
 pub fn sanitize_file_name(name: &str) -> String {
     const RESERVED: [&str; 22] = [
@@ -174,6 +189,15 @@ mod tests {
         let f = temp_file(&d, "sig.json", b"{}");
         let a = AllowedPaths::new(Some(d.clone()));
         assert!(a.check_readable(&f, &Limits::default()).is_ok());
+    }
+
+    #[test]
+    fn display_path_strips_the_windows_verbatim_prefix() {
+        assert_eq!(display_path(Path::new(r"\\?\D:\a\b.pdf")), r"D:\a\b.pdf");
+        assert_eq!(display_path(Path::new(r"\\?\UNC\srv\share\x.pdf")), r"\\srv\share\x.pdf");
+        assert_eq!(display_path(Path::new(r"C:\plain\x.pdf")), r"C:\plain\x.pdf");
+        assert_eq!(display_path(Path::new("/usr/local/x.pdf")), "/usr/local/x.pdf");
+        assert_eq!(display_path(Path::new("")), "");
     }
 
     #[test]

@@ -402,7 +402,7 @@ pub async fn sign_document(
         let mut bytes = Vec::new();
         doc.save_to(&mut bytes).map_err(|e| AppError::new("save_failed", e.to_string()))?;
         pdf_core::atomic_write(&out, &bytes, true).map_err(|e| AppError::new("save_failed", e.to_string()))?;
-        Ok(SignedResult { path: out.to_string_lossy().into_owned(), applied: rep.applied, warnings: rep.warnings })
+        Ok(SignedResult { path: pdf_core::display_path(&out), applied: rep.applied, warnings: rep.warnings })
     })
     .await
     .map_err(|e| AppError::new("internal", e.to_string()))??;

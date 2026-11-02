@@ -358,6 +358,7 @@ jobs:
           } -ArgumentList "$PWD\shots" | Out-Null
           npx playwright test -c playwright.real.config.ts e2e-real/msi-smoke.spec.ts
         env:
+          ONLY_MSI: "1"
           APP_EXE: ${{ env.MSI_EXE }}
           PDF_FILE: ${{ github.workspace }}\tests\fixtures\text-3page-outline.pdf
           SHOTS_DIR: ${{ github.workspace }}\shots

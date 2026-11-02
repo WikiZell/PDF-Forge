@@ -280,7 +280,7 @@ pub async fn bulk_pick_folder(app: AppHandle, state: State<'_, AppState>) -> Res
     files.sort();
     let mut out = Vec::new();
     for f in files.into_iter().take(20_000) {
-        out.push(state.allowed.grant(&f)?.to_string_lossy().into_owned());
+        out.push(pdf_core::display_path(&state.allowed.grant(&f)?));
     }
     Ok(out)
 }
@@ -300,7 +300,7 @@ pub async fn bulk_pick_output_dir(
     let Some(dir) = dir else { return Ok(None) };
     let canon = dir.canonicalize().map_err(|e| AppError::new("open_failed", e.to_string()))?;
     *bulk.out_dir.lock().unwrap_or_else(|p| p.into_inner()) = Some(canon.clone());
-    Ok(Some(canon.to_string_lossy().into_owned()))
+    Ok(Some(pdf_core::display_path(&canon)))
 }
 
 #[tauri::command]
@@ -338,7 +338,7 @@ pub async fn bulk_rule_save(app: AppHandle, rule: RuleFile) -> Result<Option<Str
     }
     let bytes = serde_json::to_vec_pretty(&rule).map_err(|e| AppError::new("internal", e.to_string()))?;
     pdf_core::atomic_write(&p, &bytes, true).map_err(|e| AppError::new("save_failed", e.to_string()))?;
-    Ok(Some(p.to_string_lossy().into_owned()))
+    Ok(Some(pdf_core::display_path(&p)))
 }
 
 #[derive(Serialize, Clone)]
@@ -352,13 +352,13 @@ pub struct ItemDto {
 }
 
 fn dto(r: &bulk::FileResult) -> ItemDto {
-    let input = r.input.to_string_lossy().into_owned();
+    let input = pdf_core::display_path(&r.input);
     match &r.outcome {
         Outcome::Signed { output, placed } => ItemDto {
             input,
             status: "signed",
             detail: format!("{placed} signature(s)"),
-            output: (!output.as_os_str().is_empty()).then(|| output.to_string_lossy().into_owned()),
+            output: (!output.as_os_str().is_empty()).then(|| pdf_core::display_path(output)),
         },
         Outcome::Skipped { reason } => ItemDto { input, status: "skipped", detail: reason.clone(), output: None },
         Outcome::Failed { error } => ItemDto { input, status: "failed", detail: error.clone(), output: None },
@@ -533,7 +533,7 @@ pub async fn bulk_run<R: tauri::Runtime>(
                 let csv = bulk::report_csv(&results);
                 let rp = pdf_core::unique_output_path(&out_dir, "signing-report", "", "csv");
                 let report_path =
-                    pdf_core::atomic_write(&rp, csv.as_bytes(), false).ok().map(|_| rp.to_string_lossy().into_owned());
+                    pdf_core::atomic_write(&rp, csv.as_bytes(), false).ok().map(|_| pdf_core::display_path(&rp));
                 FinishedEvent {
                     job_id: id,
                     items: results.iter().map(dto).collect(),

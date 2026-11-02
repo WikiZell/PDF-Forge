@@ -15,7 +15,8 @@ pub mod sign;
 pub mod split;
 
 pub use fs_safety::{
-    atomic_write, sanitize_file_name, unique_output_path, write_new_atomic, AllowedPaths, Limits, PathError,
+    atomic_write, display_path, sanitize_file_name, unique_output_path, write_new_atomic, AllowedPaths, Limits,
+    PathError,
 };
 pub use inspect::{inspect, DocInfo, InspectError};
 

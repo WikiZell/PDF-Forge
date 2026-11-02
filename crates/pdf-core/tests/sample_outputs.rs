@@ -85,7 +85,7 @@ fn text_pdf(pages: &[&str]) -> String {
     objs.push("<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>".to_string());
     let mut out = String::from("%PDF-1.4\n");
     for (i, o) in objs.iter().enumerate() {
-        out.push_str(&format!("{} 0 obj{o}endobj\n", i + 1));
+        out.push_str(&format!("{} 0 obj{o}\nendobj\n", i + 1));
     }
     out.push_str(&format!("trailer<</Root 1 0 R/Size {}>>\n%%EOF\n", objs.len() + 1));
     out

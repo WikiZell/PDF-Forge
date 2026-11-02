@@ -74,7 +74,7 @@ pub async fn pick_pdf(app: AppHandle, state: State<'_, AppState>) -> Result<Opti
     let Some(fp) = picked else { return Ok(None) };
     let path = fp.into_path().map_err(|e| AppError::new("open_failed", e.to_string()))?;
     let canon = state.allowed.grant(&path)?;
-    Ok(Some(canon.to_string_lossy().into_owned()))
+    Ok(Some(pdf_core::display_path(&canon)))
 }
 
 /// Open a PDF the user previously selected. `password` is used for this call only.
@@ -103,7 +103,7 @@ pub async fn open_pdf(path: String, password: Option<String>, state: State<'_, A
     let page_count = doc.page_count();
     let id = state.insert(doc);
     let file_name = canon.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let path = canon.to_string_lossy().into_owned();
+    let path = pdf_core::display_path(&canon);
     let _ = state.storage.add_recent(&path, &file_name);
     let view_state = state.storage.view_state(&path);
     Ok(DocSummary { id, path, file_name, page_count, view_state })
@@ -215,7 +215,7 @@ pub fn open_recent(path: String, state: State<'_, AppState>) -> Result<String> {
         return Err(AppError::new("not_allowed", "That file is not in the recent files list."));
     }
     match state.allowed.grant(Path::new(&path)) {
-        Ok(p) => Ok(p.to_string_lossy().into_owned()),
+        Ok(p) => Ok(pdf_core::display_path(&p)),
         Err(e) => {
             let _ = state.storage.remove_recent(&path);
             Err(AppError::new("open_failed", format!("The file could not be found: {e}")))

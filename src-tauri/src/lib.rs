@@ -57,7 +57,7 @@ pub fn run() {
             // CLI argument / "Open with": the OS hands us the path, so it counts as user-selected.
             if let Some(arg) = std::env::args_os().skip(1).map(PathBuf::from).find(|p| is_pdf(p) && p.is_file()) {
                 if let Ok(canon) = state.allowed.grant(&arg) {
-                    *state.launch_path.lock().unwrap() = Some(canon.to_string_lossy().into_owned());
+                    *state.launch_path.lock().unwrap() = Some(pdf_core::display_path(&canon));
                 }
             }
             app.manage(state);
@@ -69,7 +69,7 @@ pub fn run() {
                 let state = window.state::<AppState>();
                 if let Some(p) = paths.iter().find(|p| is_pdf(p)) {
                     if let Ok(canon) = state.allowed.grant(p) {
-                        let _ = window.emit("open-request", canon.to_string_lossy().into_owned());
+                        let _ = window.emit("open-request", pdf_core::display_path(&canon));
                     }
                 }
             }
