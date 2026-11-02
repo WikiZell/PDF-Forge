@@ -82,6 +82,40 @@ pub struct PageSize {
     pub height: f32,
 }
 
+/// Axis-aligned rectangle in view space: points (1/72 in), origin top-left of the
+/// displayed (rotated) page, y growing downwards.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+/// One run of text on a page with its bounding box in view space.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextRun {
+    pub text: String,
+    pub rect: Rect,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutlineItem {
+    pub title: String,
+    /// 0-based target page, if the bookmark resolves to one.
+    pub page: Option<usize>,
+    pub depth: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SearchHit {
+    pub page: usize,
+    pub rects: Vec<Rect>,
+}
+
+/// Upper bound on search results returned, to bound memory on hostile input.
+pub const MAX_SEARCH_HITS: usize = 5_000;
+
 /// A PNG-encoded rendered page.
 pub struct RenderedPage {
     pub png: Vec<u8>,
@@ -139,6 +173,65 @@ impl Document {
         Ok(RenderedPage { png, width, height })
     }
 
+    /// Text runs of a page with positions, for the selectable text layer.
+    pub fn page_text(&self, page: usize) -> Result<Vec<TextRun>, RenderError> {
+        let doc = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let p = self.page(&doc, page)?;
+        let map = ViewMap::new(&p);
+        let text = p.text().map_err(|e| RenderError::Render(e.to_string()))?;
+        let mut out = Vec::new();
+        for seg in text.segments().iter() {
+            let t = seg.text();
+            if t.trim().is_empty() {
+                continue;
+            }
+            out.push(TextRun { text: t, rect: map.rect(seg.bounds()) });
+        }
+        Ok(out)
+    }
+
+    /// Flattened bookmark tree (document order, with depth).
+    pub fn outline(&self) -> Vec<OutlineItem> {
+        let doc = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let mut items = Vec::new();
+        if let Some(root) = doc.bookmarks().root() {
+            walk_outline(&root, 0, &mut items);
+            // The root's siblings are top-level entries too.
+            let mut sib = root.next_sibling();
+            while let Some(b) = sib {
+                walk_outline(&b, 0, &mut items);
+                sib = b.next_sibling();
+            }
+        }
+        items
+    }
+
+    /// Search every page. Results are ordered by page then position.
+    pub fn search(&self, query: &str, match_case: bool) -> Result<Vec<SearchHit>, RenderError> {
+        if query.is_empty() {
+            return Ok(vec![]);
+        }
+        let doc = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let opts = PdfSearchOptions::new().match_case(match_case);
+        let mut hits = Vec::new();
+        for i in 0..self.page_count {
+            let p = self.page(&doc, i)?;
+            let map = ViewMap::new(&p);
+            let Ok(text) = p.text() else { continue };
+            let Ok(search) = text.search(query, &opts) else { continue };
+            while let Some(segs) = search.find_next() {
+                let rects: Vec<Rect> = segs.iter().map(|s| map.rect(s.bounds())).collect();
+                if !rects.is_empty() {
+                    hits.push(SearchHit { page: i, rects });
+                }
+                if hits.len() >= MAX_SEARCH_HITS {
+                    return Ok(hits);
+                }
+            }
+        }
+        Ok(hits)
+    }
+
     fn page<'d>(
         &self,
         doc: &'d PdfDocument<'static>,
@@ -163,5 +256,67 @@ fn map_open_error(e: PdfiumError, had_password: bool) -> RenderError {
             }
         }
         other => RenderError::Open(other.to_string()),
+    }
+}
+
+fn walk_outline(b: &PdfBookmark<'_>, depth: usize, out: &mut Vec<OutlineItem>) {
+    let mut page = b.destination().and_then(|d| d.page_index().ok());
+    if page.is_none() {
+        if let Some(a) = b.action() {
+            if let Some(l) = a.as_local_destination_action() {
+                page = l.destination().ok().and_then(|d| d.page_index().ok());
+            }
+        }
+    }
+    let page = page.map(|i| i as usize);
+    out.push(OutlineItem { title: b.title().unwrap_or_default(), page, depth });
+    if depth < 32 {
+        for c in b.iter_direct_children() {
+            walk_outline(&c, depth + 1, out);
+        }
+    }
+}
+
+/// Maps PDF user space (origin bottom-left, unrotated) to view space (top-left, rotated).
+struct ViewMap {
+    rotation: i32,
+    w0: f32,
+    h0: f32,
+    ox: f32,
+    oy: f32,
+}
+
+impl ViewMap {
+    fn new(p: &PdfPage<'_>) -> Self {
+        let rotation = match p.rotation() {
+            Ok(PdfPageRenderRotation::Degrees90) => 90,
+            Ok(PdfPageRenderRotation::Degrees180) => 180,
+            Ok(PdfPageRenderRotation::Degrees270) => 270,
+            _ => 0,
+        };
+        let (vw, vh) = (p.width().value, p.height().value);
+        let (w0, h0) = if rotation == 90 || rotation == 270 { (vh, vw) } else { (vw, vh) };
+        let (ox, oy) = p
+            .boundaries()
+            .bounding()
+            .map(|b| (b.bounds.left().value, b.bounds.bottom().value))
+            .unwrap_or((0.0, 0.0));
+        Self { rotation, w0, h0, ox, oy }
+    }
+
+    fn point(&self, x: f32, y: f32) -> (f32, f32) {
+        let (x, y) = (x - self.ox, y - self.oy);
+        match self.rotation {
+            90 => (y, x),
+            180 => (self.w0 - x, y),
+            270 => (self.h0 - y, self.w0 - x),
+            _ => (x, self.h0 - y),
+        }
+    }
+
+    fn rect(&self, r: PdfRect) -> Rect {
+        let (ax, ay) = self.point(r.left().value, r.bottom().value);
+        let (bx, by) = self.point(r.right().value, r.top().value);
+        Rect { x: ax.min(bx), y: ay.min(by), w: (ax - bx).abs(), h: (ay - by).abs() }
     }
 }

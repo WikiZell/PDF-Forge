@@ -12,14 +12,17 @@ export interface AppError {
     | "open_failed"
     | "render_failed"
     | "no_such_document"
+    | "timeout"
     | "internal";
   message: string;
 }
 
 export interface DocSummary {
   id: number;
+  path: string;
   fileName: string;
   pageCount: number;
+  viewState: ViewStateDto | null;
 }
 
 export interface PageSizePt {
@@ -60,3 +63,22 @@ export async function renderPage(id: number, page: number, scale: number): Promi
 /** Paths the user dropped on the window or opened via the OS; granted by Rust before emit. */
 export const onOpenRequest = (cb: (path: string) => void): Promise<UnlistenFn> =>
   listen<string>("open-request", (e) => cb(e.payload));
+
+export interface TextRun { text: string; rect: Rect }
+export interface Rect { x: number; y: number; w: number; h: number }
+export interface OutlineItem { title: string; page: number | null; depth: number }
+export interface SearchHit { page: number; rects: Rect[] }
+export interface RecentFile { path: string; name: string; openedAt: number }
+export interface ViewStateDto { page: number; zoom: string; layout: string }
+
+export const pageSizes = (id: number) => invoke<PageSizePt[]>("page_sizes", { id });
+export const pageText = (id: number, page: number) => invoke<TextRun[]>("page_text", { id, page });
+export const outline = (id: number) => invoke<OutlineItem[]>("outline", { id });
+export const searchDoc = (id: number, query: string, matchCase: boolean) =>
+  invoke<SearchHit[]>("search", { id, query, matchCase });
+export const recentFiles = () => invoke<RecentFile[]>("recent_files");
+export const openRecent = (path: string) => invoke<string>("open_recent", { path });
+export const forgetRecent = (path: string) => invoke<void>("forget_recent", { path });
+export const saveViewState = (path: string, view: ViewStateDto) =>
+  invoke<void>("save_view_state", { path, view });
+export const clearAppData = () => invoke<void>("clear_app_data");

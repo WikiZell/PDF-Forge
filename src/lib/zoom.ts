@@ -41,3 +41,13 @@ export function stepZoom(currentPercent: number, dir: 1 | -1): number {
   if (dir > 0) return levels.find((l) => l > cur) ?? MAX_ZOOM;
   return [...levels].reverse().find((l) => l < cur) ?? MIN_ZOOM;
 }
+
+export function serializeZoom(z: ZoomMode): string {
+  return z.kind === "percent" ? String(clampPercent(z.value)) : z.kind;
+}
+
+export function parseZoom(s: string | undefined | null): ZoomMode {
+  if (s === "fit-page") return { kind: "fit-page" };
+  if (s && /^\d{1,3}$/.test(s)) return { kind: "percent", value: clampPercent(Number(s)) };
+  return { kind: "fit-width" };
+}

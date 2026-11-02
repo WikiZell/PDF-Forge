@@ -8,3 +8,11 @@ body { margin: 0; }
   button, input, select { border: 1px solid ButtonText; }
   :focus-visible { outline: 2px solid Highlight; }
 }
+
+#print-root { display: none; }
+@media print {
+  @page { margin: 0; }
+  #app-root { display: none !important; }
+  #print-root { display: block; }
+  #print-root img { display: block; break-after: page; }
+}

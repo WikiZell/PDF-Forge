@@ -68,3 +68,76 @@ fn missing_library_gives_clear_error() {
         assert!(e.to_string().contains("PDFium"));
     }
 }
+
+const TEXT_PDF: &str = "%PDF-1.4\n\
+1 0 obj<</Type/Catalog/Pages 2 0 R/Outlines 10 0 R>>endobj\n\
+2 0 obj<</Type/Pages/Kids[3 0 R 4 0 R 5 0 R]/Count 3>>endobj\n\
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 6 0 R/Resources<</Font<</F1 9 0 R>>>>>>endobj\n\
+4 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Rotate 90/Contents 7 0 R/Resources<</Font<</F1 9 0 R>>>>>>endobj\n\
+5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 8 0 R/Resources<</Font<</F1 9 0 R>>>>>>endobj\n\
+6 0 obj<</Length 52>>stream\nBT /F1 20 Tf 50 100 Td (Hello World) Tj ET\nendstream endobj\n\
+7 0 obj<</Length 58>>stream\nBT /F1 20 Tf 50 100 Td (Second hello page) Tj ET\nendstream endobj\n\
+8 0 obj<</Length 48>>stream\nBT /F1 20 Tf 50 20 Td (Third page) Tj ET\nendstream endobj\n\
+9 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n\
+10 0 obj<</Type/Outlines/First 11 0 R/Last 13 0 R/Count 3>>endobj\n\
+11 0 obj<</Title(Chapter 1)/Parent 10 0 R/Next 13 0 R/First 12 0 R/Last 12 0 R/Count 1/Dest[3 0 R/Fit]>>endobj\n\
+12 0 obj<</Title(Section 1.1)/Parent 11 0 R/Dest[5 0 R/Fit]>>endobj\n\
+13 0 obj<</Title(Chapter 2)/Parent 10 0 R/Prev 11 0 R/Dest[4 0 R/Fit]>>endobj\n\
+trailer<</Root 1 0 R/Size 14>>\n%%EOF\n";
+
+fn text_doc() -> Option<pdf_render::Document> {
+    let _ = setup()?;
+    let p = std::env::temp_dir().join(format!("render-text-{}.pdf", std::process::id()));
+    std::fs::write(&p, TEXT_PDF).unwrap();
+    Some(pdf_render::Document::open(&p, None).unwrap())
+}
+
+#[test]
+fn text_runs_have_view_space_boxes() {
+    let Some(doc) = text_doc() else { return };
+    let runs = doc.page_text(0).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert!(runs[0].text.contains("Hello World"));
+    let r = runs[0].rect;
+    // baseline y=100 in a 200pt-high page => top-left origin y around 80..100
+    assert!((r.x - 50.0).abs() < 2.0, "x={}", r.x);
+    assert!(r.y > 70.0 && r.y < 100.0, "y={}", r.y);
+    assert!(r.w > 80.0 && r.h > 10.0);
+}
+
+#[test]
+fn text_rect_is_mapped_through_page_rotation() {
+    let Some(doc) = text_doc() else { return };
+    // page 2 is rotated 90: view is 200 wide x 300 high, text runs top-to-bottom
+    let s = doc.page_size(1).unwrap();
+    assert_eq!((s.width, s.height), (200.0, 300.0));
+    let r = doc.page_text(1).unwrap()[0].rect;
+    assert!(r.x >= 0.0 && r.x + r.w <= 200.5, "x range {} {}", r.x, r.w);
+    assert!(r.y >= 0.0 && r.y + r.h <= 300.5, "y range {} {}", r.y, r.h);
+    assert!(r.h > r.w, "rotated text should be taller than wide: {r:?}");
+}
+
+#[test]
+fn outline_is_flattened_with_depth_and_pages() {
+    let Some(doc) = text_doc() else { return };
+    let o = doc.outline();
+    let got: Vec<_> = o.iter().map(|i| (i.title.as_str(), i.depth, i.page)).collect();
+    assert_eq!(
+        got,
+        vec![("Chapter 1", 0, Some(0)), ("Section 1.1", 1, Some(2)), ("Chapter 2", 0, Some(1))]
+    );
+}
+
+#[test]
+fn search_finds_hits_across_pages_case_insensitively() {
+    let Some(doc) = text_doc() else { return };
+    let hits = doc.search("hello", false).unwrap();
+    let pages: Vec<_> = hits.iter().map(|h| h.page).collect();
+    assert_eq!(pages, vec![0, 1]);
+    assert!(!hits[0].rects.is_empty());
+    let cs = doc.search("hello", true).unwrap();
+    assert_eq!(cs.iter().map(|h| h.page).collect::<Vec<_>>(), vec![1]);
+    assert_eq!(doc.search("HELLO", true).unwrap().len(), 0);
+    assert!(doc.search("", false).unwrap().is_empty());
+    assert!(doc.search("zzzz", false).unwrap().is_empty());
+}

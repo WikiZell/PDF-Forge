@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod platform;
 mod state;
+mod storage;
 
 use std::path::PathBuf;
 
@@ -39,7 +40,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data = app.path().app_data_dir().ok();
-            let state = AppState::new(AllowedPaths::new(app_data));
+            let storage = storage::Storage::new(app_data.clone().unwrap_or_else(|| std::env::temp_dir().join("PDF Forge")));
+            let state = AppState::new(AllowedPaths::new(app_data), storage);
 
             if let Err(msg) = load_pdfium(app) {
                 *state.pdfium_error.lock().unwrap() = Some(msg);
@@ -73,6 +75,15 @@ pub fn run() {
             commands::close_pdf,
             commands::page_size,
             commands::render_page,
+            commands::page_sizes,
+            commands::page_text,
+            commands::outline,
+            commands::search,
+            commands::recent_files,
+            commands::open_recent,
+            commands::forget_recent,
+            commands::save_view_state,
+            commands::clear_app_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PDF Forge");

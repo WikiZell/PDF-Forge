@@ -185,3 +185,89 @@ mod tests {
         assert!(sanitize_file_name(&"é".repeat(300)).len() <= 200);
     }
 }
+
+/// Write `bytes` to `dest` atomically: write a temp file in the same directory, fsync, then rename.
+/// With `backup`, an existing `dest` is first copied to `<dest>.bak`.
+pub fn atomic_write(dest: &Path, bytes: &[u8], backup: bool) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = dest.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let name = dest.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let result = (|| {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+        drop(f);
+        if backup && dest.exists() {
+            let mut bak = dest.as_os_str().to_owned();
+            bak.push(".bak");
+            std::fs::copy(dest, PathBuf::from(bak))?;
+        }
+        std::fs::rename(&tmp, dest)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
+}
+
+/// Choose `<stem><suffix>.<ext>` in `dir`, adding " (2)", " (3)", ... so nothing is overwritten.
+pub fn unique_output_path(dir: &Path, stem: &str, suffix: &str, ext: &str) -> PathBuf {
+    let stem = sanitize_file_name(stem);
+    let first = dir.join(format!("{stem}{suffix}.{ext}"));
+    if !first.exists() {
+        return first;
+    }
+    (2..)
+        .map(|n| dir.join(format!("{stem}{suffix} ({n}).{ext}")))
+        .find(|p| !p.exists())
+        .unwrap()
+}
+
+#[cfg(test)]
+mod write_tests {
+    use super::*;
+
+    fn dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("pdf-core-w-{tag}-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn atomic_write_creates_replaces_and_backs_up() {
+        let d = dir("atomic");
+        let f = d.join("out.bin");
+        atomic_write(&f, b"one", true).unwrap();
+        assert_eq!(std::fs::read(&f).unwrap(), b"one");
+        assert!(!d.join("out.bin.bak").exists());
+        atomic_write(&f, b"two", true).unwrap();
+        assert_eq!(std::fs::read(&f).unwrap(), b"two");
+        assert_eq!(std::fs::read(d.join("out.bin.bak")).unwrap(), b"one");
+        // no temp files left behind
+        let leftovers = std::fs::read_dir(&d).unwrap().filter(|e| {
+            e.as_ref().unwrap().file_name().to_string_lossy().ends_with(".tmp")
+        });
+        assert_eq!(leftovers.count(), 0);
+    }
+
+    #[test]
+    fn atomic_write_failure_leaves_original_and_no_temp() {
+        let d = dir("atomicfail");
+        let f = d.join("sub").join("missing-dir.bin"); // parent missing
+        assert!(atomic_write(&f, b"x", false).is_err());
+    }
+
+    #[test]
+    fn unique_output_never_overwrites() {
+        let d = dir("unique");
+        let a = unique_output_path(&d, "doc", "_signed", "pdf");
+        assert_eq!(a.file_name().unwrap(), "doc_signed.pdf");
+        std::fs::write(&a, b"x").unwrap();
+        let b = unique_output_path(&d, "doc", "_signed", "pdf");
+        assert_eq!(b.file_name().unwrap(), "doc_signed (2).pdf");
+        std::fs::write(&b, b"x").unwrap();
+        assert_eq!(unique_output_path(&d, "doc", "_signed", "pdf").file_name().unwrap(), "doc_signed (3).pdf");
+        assert_eq!(unique_output_path(&d, "a/b", "", "pdf").file_name().unwrap(), "a_b.pdf");
+    }
+}

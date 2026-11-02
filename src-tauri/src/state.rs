@@ -5,9 +5,12 @@ use std::sync::{Arc, Mutex};
 use pdf_core::{AllowedPaths, Limits};
 use pdf_render::Document;
 
+use crate::storage::Storage;
+
 pub struct AppState {
     pub allowed: AllowedPaths,
     pub limits: Limits,
+    pub storage: Storage,
     docs: Mutex<HashMap<u64, Arc<Document>>>,
     next_id: AtomicU64,
     /// Result of loading PDFium at startup: None = ok, Some(message) = failed.
@@ -17,9 +20,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(allowed: AllowedPaths) -> Self {
+    pub fn new(allowed: AllowedPaths, storage: Storage) -> Self {
         Self {
             allowed,
+            storage,
             limits: Limits::default(),
             docs: Mutex::default(),
             next_id: AtomicU64::new(1),

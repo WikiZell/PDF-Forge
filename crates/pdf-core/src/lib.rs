@@ -7,5 +7,5 @@
 pub mod fs_safety;
 pub mod inspect;
 
-pub use fs_safety::{sanitize_file_name, AllowedPaths, Limits, PathError};
+pub use fs_safety::{atomic_write, sanitize_file_name, unique_output_path, AllowedPaths, Limits, PathError};
 pub use inspect::{inspect, DocInfo, InspectError};
