@@ -3,3 +3,8 @@ dist/
 target/
 *.log
 .DS_Store
+test-results/
+playwright-report/
+fuzz/target/
+fuzz/corpus/
+fuzz/artifacts/

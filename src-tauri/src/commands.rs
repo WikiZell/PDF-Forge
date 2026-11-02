@@ -10,15 +10,13 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::storage::{RecentFile, ViewState};
+use crate::storage::{RecentFile, Settings, ViewState};
 
 /// Per-call budget for PDFium work on untrusted input. PDFium cannot be interrupted, so on
 /// timeout the worker is abandoned and the caller gets an error instead of a frozen UI.
 const WORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-async fn run_timed<T: Send + 'static>(
-    f: impl FnOnce() -> Result<T> + Send + 'static,
-) -> Result<T> {
+async fn run_timed<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(f());
@@ -81,13 +79,9 @@ pub async fn pick_pdf(app: AppHandle, state: State<'_, AppState>) -> Result<Opti
 
 /// Open a PDF the user previously selected. `password` is used for this call only.
 #[tauri::command]
-pub async fn open_pdf(
-    path: String,
-    password: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<DocSummary> {
-    let canon: PathBuf = state.allowed.check_readable(Path::new(&path), &state.limits)?;
-    let max_pages = state.limits.max_pages;
+pub async fn open_pdf(path: String, password: Option<String>, state: State<'_, AppState>) -> Result<DocSummary> {
+    let canon: PathBuf = state.allowed.check_readable(Path::new(&path), &state.limits())?;
+    let max_pages = state.limits().max_pages;
     let p = canon.clone();
 
     let doc = run_timed(move || -> Result<Document> {
@@ -183,10 +177,7 @@ pub fn page_sizes(id: u64, state: State<'_, AppState>) -> Result<Vec<PageSizePt>
 pub async fn page_text(id: u64, page: usize, state: State<'_, AppState>) -> Result<Vec<TextRun>> {
     let d = doc(&state, id)?;
     run_timed(move || {
-        Ok(d.page_text(page)?
-            .into_iter()
-            .map(|r| TextRun { text: r.text, rect: r.rect.into() })
-            .collect())
+        Ok(d.page_text(page)?.into_iter().map(|r| TextRun { text: r.text, rect: r.rect.into() }).collect())
     })
     .await
 }
@@ -239,12 +230,27 @@ pub fn forget_recent(path: String, state: State<'_, AppState>) {
 
 #[tauri::command]
 pub fn save_view_state(path: String, view: ViewState, state: State<'_, AppState>) {
-    if state.allowed.check_readable(Path::new(&path), &state.limits).is_ok() {
+    if state.allowed.check_readable(Path::new(&path), &state.limits()).is_ok() {
         let _ = state.storage.save_view_state(&path, view);
     }
 }
 
 #[tauri::command]
 pub fn clear_app_data(state: State<'_, AppState>) -> Result<()> {
-    state.storage.clear_all().map_err(|e| AppError::new("internal", e.to_string()))
+    state.storage.clear_all().map_err(|e| AppError::new("internal", e.to_string()))?;
+    state.set_limits(Settings::default().limits());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Settings {
+    state.storage.settings()
+}
+
+#[tauri::command]
+pub fn set_settings(settings: Settings, state: State<'_, AppState>) -> Result<Settings> {
+    settings.validate().map_err(|m| AppError::new("invalid_edit", m))?;
+    state.storage.save_settings(&settings).map_err(|e| AppError::new("internal", e.to_string()))?;
+    state.set_limits(settings.limits());
+    Ok(settings)
 }

@@ -93,15 +93,25 @@ fn snapshot(id: u64, s: &Session) -> OrgState {
                 let (w, h) = s.sizes[*src][*page];
                 PageDto { kind: "source", src: *src, page: *page, rotate: e.rotate, width: w, height: h }
             }
-            PageKind::Blank { width, height } => {
-                PageDto { kind: "blank", src: 0, page: 0, rotate: e.rotate, width: *width as f32, height: *height as f32 }
-            }
+            PageKind::Blank { width, height } => PageDto {
+                kind: "blank",
+                src: 0,
+                page: 0,
+                rotate: e.rotate,
+                width: *width as f32,
+                height: *height as f32,
+            },
         })
         .collect();
     OrgState {
         session: id,
         pages,
-        sources: s.names.iter().zip(&s.renders).map(|(n, r)| SourceDto { name: n.clone(), page_count: r.page_count() }).collect(),
+        sources: s
+            .names
+            .iter()
+            .zip(&s.renders)
+            .map(|(n, r)| SourceDto { name: n.clone(), page_count: r.page_count() })
+            .collect(),
         can_undo: s.project.can_undo(),
         can_redo: s.project.can_redo(),
         can_save_over: s.primary.is_some(),
@@ -125,7 +135,9 @@ fn load_err(e: pdf_core::LoadError) -> AppError {
 }
 
 /// Parse + open a source (structure via lopdf, pixels via PDFium). Runs on a worker thread.
-fn load_source(path: &Path, password: Option<&str>, limits: &pdf_core::Limits) -> Result<(pdf_core::lopdf::Document, RenderDoc, Vec<(f32, f32)>)> {
+type LoadedSource = (pdf_core::lopdf::Document, RenderDoc, Vec<(f32, f32)>);
+
+fn load_source(path: &Path, password: Option<&str>, limits: &pdf_core::Limits) -> Result<LoadedSource> {
     let doc = pdf_core::load_file(path, password, limits).map_err(load_err)?;
     let render = RenderDoc::open(path, password)?;
     let sizes = (0..render.page_count())
@@ -142,9 +154,7 @@ fn file_label(p: &Path) -> String {
 }
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
-    tauri::async_runtime::spawn_blocking(f)
-        .await
-        .map_err(|e| AppError::new("internal", e.to_string()))?
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| AppError::new("internal", e.to_string()))?
 }
 
 #[tauri::command]
@@ -171,8 +181,8 @@ pub async fn org_add_file(
     insert_at: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<OrgState> {
-    let canon = state.allowed.check_readable(Path::new(&path), &state.limits)?;
-    let limits = state.limits;
+    let canon = state.allowed.check_readable(Path::new(&path), &state.limits())?;
+    let limits = state.limits();
     let sess = state.sessions.get(session)?;
     let (doc, render, sizes) = {
         let c = canon.clone();
@@ -206,13 +216,31 @@ fn with_session<T>(state: &AppState, id: u64, f: impl FnOnce(&mut Session) -> Re
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub enum Edit {
-    Move { indices: Vec<usize>, to: usize },
-    Rotate { indices: Vec<usize>, degrees: i32 },
-    Delete { indices: Vec<usize> },
-    Duplicate { indices: Vec<usize> },
+    Move {
+        indices: Vec<usize>,
+        to: usize,
+    },
+    Rotate {
+        indices: Vec<usize>,
+        degrees: i32,
+    },
+    Delete {
+        indices: Vec<usize>,
+    },
+    Duplicate {
+        indices: Vec<usize>,
+    },
     /// size: "a4" | "letter" | "same" (same as page `like`)
-    InsertBlank { at: usize, size: String, like: Option<usize> },
-    InsertFrom { src: usize, pages: Option<Vec<usize>>, at: usize },
+    InsertBlank {
+        at: usize,
+        size: String,
+        like: Option<usize>,
+    },
+    InsertFrom {
+        src: usize,
+        pages: Option<Vec<usize>>,
+        at: usize,
+    },
     Undo,
     Redo,
 }
@@ -273,7 +301,13 @@ pub fn org_edit(session: u64, edit: Edit, state: State<'_, AppState>) -> Result<
 
 /// Thumbnail for a source page (rotation is applied by the UI).
 #[tauri::command]
-pub async fn org_thumb(session: u64, src: usize, page: usize, scale: f32, state: State<'_, AppState>) -> Result<Response> {
+pub async fn org_thumb(
+    session: u64,
+    src: usize,
+    page: usize,
+    scale: f32,
+    state: State<'_, AppState>,
+) -> Result<Response> {
     let doc = with_session(&state, session, |s| {
         s.renders.get(src).cloned().ok_or_else(|| AppError::new("no_such_document", "Unknown source."))
     })?;
@@ -307,7 +341,11 @@ fn to_preview(count: usize, bytes: usize, r: pdf_core::BuildReport) -> Preview {
     Preview {
         page_count: count,
         size_bytes: bytes,
-        renamed_fields: r.renamed_fields.into_iter().map(|f| Rename { source: f.source, from: f.from, to: f.to }).collect(),
+        renamed_fields: r
+            .renamed_fields
+            .into_iter()
+            .map(|f| Rename { source: f.source, from: f.from, to: f.to })
+            .collect(),
         warnings: r.warnings,
         dropped_links: r.dropped_links,
         dropped_bookmarks: r.dropped_bookmarks,
@@ -385,9 +423,11 @@ pub async fn org_save_over(session: u64, state: State<'_, AppState>) -> Result<S
     let sess = state.sessions.get(session)?;
     let primary = {
         let g = sess.lock().unwrap_or_else(|p| p.into_inner());
-        g.primary.clone().ok_or_else(|| AppError::new("save_failed", "There is no original file to save over. Use Save a copy."))?
+        g.primary
+            .clone()
+            .ok_or_else(|| AppError::new("save_failed", "There is no original file to save over. Use Save a copy."))?
     };
-    state.allowed.check_readable(&primary, &state.limits)?;
+    state.allowed.check_readable(&primary, &state.limits())?;
     blocking(move || {
         let g = sess.lock().unwrap_or_else(|p| p.into_inner());
         let n = g.project.pages.len();
@@ -414,7 +454,12 @@ pub struct SplitResult {
 
 /// Split into several files in a folder the user picks. Never overwrites existing files.
 #[tauri::command]
-pub async fn org_split(app: AppHandle, session: u64, mode: SplitMode, state: State<'_, AppState>) -> Result<Option<SplitResult>> {
+pub async fn org_split(
+    app: AppHandle,
+    session: u64,
+    mode: SplitMode,
+    state: State<'_, AppState>,
+) -> Result<Option<SplitResult>> {
     let sess = state.sessions.get(session)?;
     // Plan first so errors (bad ranges) show before any dialog.
     let (parts, stem) = {
@@ -423,10 +468,17 @@ pub async fn org_split(app: AppHandle, session: u64, mode: SplitMode, state: Sta
         let stem = g.names.first().map(|n| n.trim_end_matches(".pdf").to_string()).unwrap_or_else(|| "document".into());
         let parts = match mode {
             SplitMode::EveryN { n } => pdf_core::split_every_n(count, n),
-            SplitMode::Ranges { spec } => pdf_core::split_ranges(&spec, count).map_err(|m| AppError::new("invalid_edit", m))?,
+            SplitMode::Ranges { spec } => {
+                pdf_core::split_ranges(&spec, count).map_err(|m| AppError::new("invalid_edit", m))?
+            }
             SplitMode::Bookmarks => {
-                if g.project.sources.len() != 1 || g.project.pages.iter().enumerate().any(|(i, e)| e.kind != PageKind::Source { src: 0, page: i }) {
-                    return Err(AppError::new("invalid_edit", "Splitting by bookmarks needs an unmodified single document. Save your edits first."));
+                if g.project.sources.len() != 1
+                    || g.project.pages.iter().enumerate().any(|(i, e)| e.kind != PageKind::Source { src: 0, page: i })
+                {
+                    return Err(AppError::new(
+                        "invalid_edit",
+                        "Splitting by bookmarks needs an unmodified single document. Save your edits first.",
+                    ));
                 }
                 let p = pdf_core::split_by_bookmarks(&g.project.sources[0].doc);
                 if p.is_empty() {
@@ -437,9 +489,11 @@ pub async fn org_split(app: AppHandle, session: u64, mode: SplitMode, state: Sta
         };
         (parts, stem)
     };
-    let dir = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok()))
-        .await
-        .map_err(|e| AppError::new("internal", e.to_string()))?;
+    let dir = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok())
+    })
+    .await
+    .map_err(|e| AppError::new("internal", e.to_string()))?;
     let Some(dir) = dir else { return Ok(None) };
     blocking(move || {
         let g = sess.lock().unwrap_or_else(|p| p.into_inner());

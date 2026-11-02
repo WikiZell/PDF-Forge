@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/pdf-core", "crates/pdf-render", "src-tauri"]
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.1.0"

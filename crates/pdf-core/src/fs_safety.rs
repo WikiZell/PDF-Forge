@@ -86,8 +86,8 @@ impl AllowedPaths {
 /// Make a string safe to use as a single file-name component on Windows, macOS and Linux.
 pub fn sanitize_file_name(name: &str) -> String {
     const RESERVED: [&str; 22] = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1",
+        "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
     let cleaned: String = name
         .chars()
@@ -218,10 +218,7 @@ pub fn unique_output_path(dir: &Path, stem: &str, suffix: &str, ext: &str) -> Pa
     if !first.exists() {
         return first;
     }
-    (2..)
-        .map(|n| dir.join(format!("{stem}{suffix} ({n}).{ext}")))
-        .find(|p| !p.exists())
-        .unwrap()
+    (2..).map(|n| dir.join(format!("{stem}{suffix} ({n}).{ext}"))).find(|p| !p.exists()).unwrap()
 }
 
 #[cfg(test)]
@@ -245,9 +242,9 @@ mod write_tests {
         assert_eq!(std::fs::read(&f).unwrap(), b"two");
         assert_eq!(std::fs::read(d.join("out.bin.bak")).unwrap(), b"one");
         // no temp files left behind
-        let leftovers = std::fs::read_dir(&d).unwrap().filter(|e| {
-            e.as_ref().unwrap().file_name().to_string_lossy().ends_with(".tmp")
-        });
+        let leftovers = std::fs::read_dir(&d)
+            .unwrap()
+            .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().ends_with(".tmp"));
         assert_eq!(leftovers.count(), 0);
     }
 

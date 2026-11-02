@@ -164,7 +164,7 @@ fn explicit_dest(doc: &Document, root: Option<&Dictionary>, o: &Object) -> Optio
 fn lookup_named(doc: &Document, catalog: &Dictionary, key: &[u8]) -> Option<Vec<Object>> {
     // PDF 1.1 style: /Dests dictionary
     if let Some(d) = get(doc, catalog, b"Dests").and_then(|o| dict(doc, o)) {
-        if let Some(v) = d.get(key).ok() {
+        if let Ok(v) = d.get(key) {
             return explicit_dest(doc, None, v);
         }
     }
@@ -224,7 +224,13 @@ struct OutlineNode {
     children: Vec<OutlineNode>,
 }
 
-fn read_outline(doc: &Document, catalog: &Dictionary, first: &Object, depth: usize, budget: &mut usize) -> Vec<OutlineNode> {
+fn read_outline(
+    doc: &Document,
+    catalog: &Dictionary,
+    first: &Object,
+    depth: usize,
+    budget: &mut usize,
+) -> Vec<OutlineNode> {
     let mut out = Vec::new();
     let mut cur = Some(first.clone());
     let mut seen: HashSet<ObjectId> = HashSet::new();
@@ -245,13 +251,15 @@ fn read_outline(doc: &Document, catalog: &Dictionary, first: &Object, depth: usi
                 }
             }
         }
-        let children = d
-            .get(b"First")
-            .ok()
-            .map(|f| read_outline(doc, catalog, f, depth + 1, budget))
-            .unwrap_or_default();
+        let children =
+            d.get(b"First").ok().map(|f| read_outline(doc, catalog, f, depth + 1, budget)).unwrap_or_default();
         out.push(OutlineNode {
-            title: d.get(b"Title").ok().and_then(|t| deref(doc, t)).cloned().unwrap_or(Object::String(vec![], StringFormat::Literal)),
+            title: d
+                .get(b"Title")
+                .ok()
+                .and_then(|t| deref(doc, t))
+                .cloned()
+                .unwrap_or(Object::String(vec![], StringFormat::Literal)),
             dest,
             action,
             flags: d.get(b"F").ok().cloned(),
@@ -376,7 +384,8 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
         for &p in &pages {
             flatten_inherited(&mut d, p);
         }
-        let catalog = d.trailer.get(b"Root").ok().and_then(|o| if let Object::Reference(r) = o { Some(*r) } else { None });
+        let catalog =
+            d.trailer.get(b"Root").ok().and_then(|o| if let Object::Reference(r) = o { Some(*r) } else { None });
         if !info_done {
             if let Ok(Object::Reference(r)) = d.trailer.get(b"Info") {
                 out.trailer.set("Info", Object::Reference(*r));
@@ -418,7 +427,10 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
                 let mut pd = Dictionary::new();
                 pd.set("Type", Object::Name(b"Page".to_vec()));
                 pd.set("Parent", Object::Reference(pages_id));
-                pd.set("MediaBox", Object::Array(vec![0.into(), 0.into(), Object::Real(*width as f32), Object::Real(*height as f32)]));
+                pd.set(
+                    "MediaBox",
+                    Object::Array(vec![0.into(), 0.into(), Object::Real(*width as f32), Object::Real(*height as f32)]),
+                );
                 pd.set("Resources", Object::Dictionary(Dictionary::new()));
                 let id = out.new_object_id();
                 out.objects.insert(id, Object::Dictionary(pd));
@@ -504,15 +516,17 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
                 }
             }
             ad.remove(b"P");
-            if is_clone || aid.is_none() {
-                let nid = out.add_object(Object::Dictionary(ad));
-                surviving_annots.insert(nid);
-                new_list.push(Object::Reference(nid));
-            } else {
-                let id = aid.unwrap();
-                out.objects.insert(id, Object::Dictionary(ad));
-                surviving_annots.insert(id);
-                new_list.push(Object::Reference(id));
+            match aid {
+                Some(id) if !is_clone => {
+                    out.objects.insert(id, Object::Dictionary(ad));
+                    surviving_annots.insert(id);
+                    new_list.push(Object::Reference(id));
+                }
+                _ => {
+                    let nid = out.add_object(Object::Dictionary(ad));
+                    surviving_annots.insert(nid);
+                    new_list.push(Object::Reference(nid));
+                }
             }
         }
         if let Some(Object::Dictionary(pd)) = out.objects.get_mut(&pid) {
@@ -525,7 +539,7 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
     for &src in &used {
         let Some(cat) = catalog_of(src) else { continue };
         let Some(ol) = get(&out, &cat, b"Outlines").and_then(|o| dict(&out, o)) else { continue };
-        if let Some(first) = ol.get(b"First").ok() {
+        if let Ok(first) = ol.get(b"First") {
             let mut budget = 100_000;
             let nodes = read_outline(&out, &cat, first, 0, &mut budget);
             all_nodes.extend(remap_outline(nodes, &page_map, &mut report.dropped_bookmarks));
@@ -545,7 +559,11 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
             da = af.get(b"DA").ok().cloned();
         }
         need_appearances |= matches!(af.get(b"NeedAppearances"), Ok(Object::Boolean(true)));
-        if let Some(fonts) = get(&out, &af, b"DR").and_then(|o| dict(&out, o)).and_then(|dr| get(&out, dr, b"Font")).and_then(|o| dict(&out, o)) {
+        if let Some(fonts) = get(&out, &af, b"DR")
+            .and_then(|o| dict(&out, o))
+            .and_then(|dr| get(&out, dr, b"Font"))
+            .and_then(|o| dict(&out, o))
+        {
             for (k, v) in fonts.iter() {
                 if !dr_fonts.has(k) {
                     dr_fonts.set(k.clone(), v.clone());
@@ -568,7 +586,11 @@ pub fn build(project: &Project, subset: Option<&[usize]>) -> Result<(Vec<u8>, Bu
                         n += 1;
                     }
                     final_name = format!("{name}_{n}");
-                    report.renamed_fields.push(FieldRename { source: imported[&src].name.clone(), from: name, to: final_name.clone() });
+                    report.renamed_fields.push(FieldRename {
+                        source: imported[&src].name.clone(),
+                        from: name,
+                        to: final_name.clone(),
+                    });
                     if let Some(Object::Dictionary(fd)) = out.objects.get_mut(&fid) {
                         fd.set("T", to_text_string(&final_name));
                     }

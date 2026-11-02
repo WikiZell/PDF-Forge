@@ -40,7 +40,10 @@ fn encrypted_bytes(user_pw: &str) -> Vec<u8> {
 fn encrypted_rc4(user_pw: &str) -> Vec<u8> {
     let mut doc = with_id(make_pdf("R", 2, false));
     let ver = EncryptionVersion::V2 {
-        document: &doc, owner_password: "owner", user_password: user_pw, key_length: 128,
+        document: &doc,
+        owner_password: "owner",
+        user_password: user_pw,
+        key_length: 128,
         permissions: Permissions::PRINTABLE,
     };
     let state = EncryptionState::try_from(ver).unwrap();
@@ -130,7 +133,8 @@ fn byte_flip_mutation_never_panics_through_load_and_build() {
         state
     };
     let (mut loaded, mut built) = (0, 0);
-    for _ in 0..400 {
+    let iters: usize = std::env::var("FUZZ_ITERS").ok().and_then(|v| v.parse().ok()).unwrap_or(400);
+    for _ in 0..iters {
         let mut b = good.clone();
         for _ in 0..(1 + next() % 8) {
             let i = (next() as usize) % b.len();
@@ -144,6 +148,24 @@ fn byte_flip_mutation_never_panics_through_load_and_build() {
         }
         if let Ok(d) = load_bytes(&b, None, &lim) {
             loaded += 1;
+            // signing must also survive damaged-but-loadable files (both modes)
+            for mode in [pdf_core::sign::Mode::Annotate, pdf_core::sign::Mode::Flatten] {
+                let mut signed = d.clone();
+                let img = image::RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
+                let pl = pdf_core::sign::Placement {
+                    page: 0,
+                    x: 10.0,
+                    y: 10.0,
+                    w: 40.0,
+                    h: 20.0,
+                    rotation: 30.0,
+                    content: pdf_core::sign::Content::Image(img),
+                };
+                if pdf_core::sign::apply(&mut signed, &[pl], mode).is_ok() {
+                    let mut out = Vec::new();
+                    let _ = signed.save_to(&mut out);
+                }
+            }
             let mut p = project_of(vec![("m.pdf", d)]);
             if p.pages.len() > 1 {
                 let _ = p.move_pages(&[0], 1);
@@ -154,8 +176,8 @@ fn byte_flip_mutation_never_panics_through_load_and_build() {
             }
         }
     }
-    assert!(loaded > 50, "mutations should often still load ({loaded})");
-    assert!(built > 25, "and often still build ({built})");
+    assert!(loaded * 8 > iters, "mutations should often still load ({loaded}/{iters})");
+    assert!(built * 16 > iters, "and often still build ({built}/{iters})");
 }
 
 #[test]

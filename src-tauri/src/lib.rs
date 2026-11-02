@@ -45,8 +45,10 @@ pub fn run() {
         .manage(bulk::BulkState::default())
         .setup(|app| {
             let app_data = app.path().app_data_dir().ok();
-            let storage = storage::Storage::new(app_data.clone().unwrap_or_else(|| std::env::temp_dir().join("PDF Forge")));
+            let storage =
+                storage::Storage::new(app_data.clone().unwrap_or_else(|| std::env::temp_dir().join("PDF Forge")));
             let state = AppState::new(AllowedPaths::new(app_data), storage);
+            state.set_limits(state.storage.settings().limits());
 
             if let Err(msg) = load_pdfium(app) {
                 *state.pdfium_error.lock().unwrap() = Some(msg);
@@ -89,6 +91,8 @@ pub fn run() {
             commands::forget_recent,
             commands::save_view_state,
             commands::clear_app_data,
+            commands::get_settings,
+            commands::set_settings,
             organize::org_new,
             organize::org_add_file,
             organize::org_edit,

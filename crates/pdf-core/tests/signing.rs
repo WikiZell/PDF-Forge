@@ -23,10 +23,17 @@ fn blank_page(rotate: i64, crop: Option<[i64; 4]>) -> Document {
         "Type"=>"Page","Parent"=>Object::Reference(pages),"Contents"=>Object::Reference(content),
         "MediaBox"=>vec![0.into(),0.into(),300.into(),400.into()],"Resources"=>dictionary!{},
     };
-    if rotate != 0 { page.set("Rotate", rotate); }
-    if let Some(c) = crop { page.set("CropBox", c.iter().map(|v| Object::Integer(*v)).collect::<Vec<_>>()); }
+    if rotate != 0 {
+        page.set("Rotate", rotate);
+    }
+    if let Some(c) = crop {
+        page.set("CropBox", c.iter().map(|v| Object::Integer(*v)).collect::<Vec<_>>());
+    }
     let pid = doc.add_object(page);
-    doc.objects.insert(pages, Object::Dictionary(dictionary! { "Type"=>"Pages","Kids"=>vec![Object::Reference(pid)],"Count"=>1 }));
+    doc.objects.insert(
+        pages,
+        Object::Dictionary(dictionary! { "Type"=>"Pages","Kids"=>vec![Object::Reference(pid)],"Count"=>1 }),
+    );
     let cat = doc.add_object(dictionary! { "Type"=>"Catalog","Pages"=>Object::Reference(pages) });
     doc.trailer.set("Root", Object::Reference(cat));
     doc
@@ -70,7 +77,10 @@ fn place(content: Content) -> Placement {
 
 #[test]
 fn image_lands_at_requested_view_rect_for_every_page_rotation_and_both_modes() {
-    if !pdfium_ready() { eprintln!("skipping: no PDFium"); return; }
+    if !pdfium_ready() {
+        eprintln!("skipping: no PDFium");
+        return;
+    }
     for rot in [0, 90, 180, 270] {
         for mode in [Mode::Annotate, Mode::Flatten] {
             let mut doc = blank_page(rot, None);
@@ -86,7 +96,9 @@ fn image_lands_at_requested_view_rect_for_every_page_rotation_and_both_modes() {
 
 #[test]
 fn cropbox_offset_is_honoured() {
-    if !pdfium_ready() { return; }
+    if !pdfium_ready() {
+        return;
+    }
     for mode in [Mode::Annotate, Mode::Flatten] {
         let mut doc = blank_page(0, Some([20, 30, 260, 350])); // 240x320 visible
         apply(&mut doc, &[place(solid(40, 20))], mode).unwrap();
@@ -98,7 +110,9 @@ fn cropbox_offset_is_honoured() {
 
 #[test]
 fn rotated_placement_has_rotated_bounding_box() {
-    if !pdfium_ready() { return; }
+    if !pdfium_ready() {
+        return;
+    }
     for rot in [0, 90] {
         for mode in [Mode::Annotate, Mode::Flatten] {
             let mut doc = blank_page(rot, None);
@@ -121,10 +135,16 @@ fn rotated_placement_has_rotated_bounding_box() {
 
 #[test]
 fn transparent_pixels_do_not_paint() {
-    if !pdfium_ready() { return; }
+    if !pdfium_ready() {
+        return;
+    }
     // left half opaque black, right half fully transparent
     let mut im = RgbaImage::from_pixel(40, 20, Rgba([0, 0, 0, 0]));
-    for x in 0..20 { for y in 0..20 { im.put_pixel(x, y, Rgba([0, 0, 0, 255])); } }
+    for x in 0..20 {
+        for y in 0..20 {
+            im.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+        }
+    }
     for mode in [Mode::Annotate, Mode::Flatten] {
         let mut doc = blank_page(0, None);
         apply(&mut doc, &[place(Content::Image(im.clone()))], mode).unwrap();
@@ -135,7 +155,9 @@ fn transparent_pixels_do_not_paint() {
 
 #[test]
 fn ink_signature_is_drawn_inside_its_box_in_both_modes() {
-    if !pdfium_ready() { return; }
+    if !pdfium_ready() {
+        return;
+    }
     let strokes = vec![
         Stroke { points: vec![[0.0, 0.0, 0.5], [200.0, 100.0, 0.5]] },
         Stroke { points: vec![[0.0, 100.0, 0.8], [200.0, 0.0, 0.8]] },
@@ -154,7 +176,9 @@ fn ink_signature_is_drawn_inside_its_box_in_both_modes() {
 
 #[test]
 fn text_is_drawn_inside_its_box_and_escapes_parentheses() {
-    if !pdfium_ready() { return; }
+    if !pdfium_ready() {
+        return;
+    }
     for mode in [Mode::Annotate, Mode::Flatten] {
         let mut doc = blank_page(0, None);
         let c = Content::Text { text: "Date (05/11/2026) \\ ok".into(), font_size: 14.0, color: [0.0, 0.0, 0.0] };
@@ -177,22 +201,35 @@ fn unsupported_characters_are_reported_not_fatal() {
 #[test]
 fn annotation_mode_creates_real_annotations_with_appearance_streams() {
     let mut doc = blank_page(0, None);
-    let ink = Content::Ink { strokes: vec![Stroke { points: vec![[0.0, 0.0, 0.5], [10.0, 10.0, 0.5]] }], view: (10.0, 10.0), width: 2.0, color: [0.0; 3] };
-    apply(&mut doc, &[
-        place(solid(10, 10)),
-        place(ink),
-        place(Content::Text { text: "x".into(), font_size: 10.0, color: [0.0; 3] }),
-    ], Mode::Annotate).unwrap();
+    let ink = Content::Ink {
+        strokes: vec![Stroke { points: vec![[0.0, 0.0, 0.5], [10.0, 10.0, 0.5]] }],
+        view: (10.0, 10.0),
+        width: 2.0,
+        color: [0.0; 3],
+    };
+    apply(
+        &mut doc,
+        &[
+            place(solid(10, 10)),
+            place(ink),
+            place(Content::Text { text: "x".into(), font_size: 10.0, color: [0.0; 3] }),
+        ],
+        Mode::Annotate,
+    )
+    .unwrap();
     let pid = *doc.get_pages().values().next().unwrap();
     let annots = doc.get_dictionary(pid).unwrap().get(b"Annots").unwrap().as_array().unwrap().clone();
-    let subtypes: Vec<String> = annots.iter().map(|a| {
-        let d = doc.get_dictionary(a.as_reference().unwrap()).unwrap();
-        assert!(d.has(b"Rect") && d.has(b"AP"), "every annotation needs Rect and an appearance");
-        let ap = d.get(b"AP").unwrap().as_dict().unwrap();
-        let n = ap.get(b"N").unwrap().as_reference().unwrap();
-        assert!(matches!(doc.get_object(n).unwrap(), Object::Stream(_)));
-        String::from_utf8_lossy(d.get(b"Subtype").unwrap().as_name().unwrap()).into_owned()
-    }).collect();
+    let subtypes: Vec<String> = annots
+        .iter()
+        .map(|a| {
+            let d = doc.get_dictionary(a.as_reference().unwrap()).unwrap();
+            assert!(d.has(b"Rect") && d.has(b"AP"), "every annotation needs Rect and an appearance");
+            let ap = d.get(b"AP").unwrap().as_dict().unwrap();
+            let n = ap.get(b"N").unwrap().as_reference().unwrap();
+            assert!(matches!(doc.get_object(n).unwrap(), Object::Stream(_)));
+            String::from_utf8_lossy(d.get(b"Subtype").unwrap().as_name().unwrap()).into_owned()
+        })
+        .collect();
     assert_eq!(subtypes, ["Stamp", "Ink", "FreeText"]);
     // a flattened copy has none
     let mut flat = blank_page(0, None);

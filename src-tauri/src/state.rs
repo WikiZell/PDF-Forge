@@ -10,7 +10,7 @@ use crate::storage::Storage;
 
 pub struct AppState {
     pub allowed: AllowedPaths,
-    pub limits: Limits,
+    limits: std::sync::RwLock<Limits>,
     pub storage: Storage,
     pub sessions: Sessions,
     docs: Mutex<HashMap<u64, Arc<Document>>>,
@@ -27,12 +27,21 @@ impl AppState {
             allowed,
             storage,
             sessions: Sessions::default(),
-            limits: Limits::default(),
+            limits: std::sync::RwLock::new(Limits::default()),
             docs: Mutex::default(),
             next_id: AtomicU64::new(1),
             pdfium_error: Mutex::default(),
             launch_path: Mutex::default(),
         }
+    }
+
+    /// Current size/page limits (user-configurable in Settings).
+    pub fn limits(&self) -> Limits {
+        *self.limits.read().unwrap_or_else(|p| p.into_inner())
+    }
+
+    pub fn set_limits(&self, l: Limits) {
+        *self.limits.write().unwrap_or_else(|p| p.into_inner()) = l;
     }
 
     pub fn insert(&self, doc: Document) -> u64 {

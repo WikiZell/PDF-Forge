@@ -28,7 +28,9 @@ fn pdfium_agrees_with_reordered_merged_output() {
     std::fs::write(&f, &bytes).unwrap();
 
     let doc = pdf_render::Document::open(&f, None).expect("PDFium opens the output");
-    let texts: Vec<String> = (0..doc.page_count()).map(|i| doc.page_text(i).unwrap().iter().map(|r| r.text.clone()).collect::<String>()).collect();
+    let texts: Vec<String> = (0..doc.page_count())
+        .map(|i| doc.page_text(i).unwrap().iter().map(|r| r.text.clone()).collect::<String>())
+        .collect();
     let expect = ["B-P2", "A-P0", "A-P1", "B-P0", "B-P1"];
     assert_eq!(doc.page_count(), expect.len());
     for (t, e) in texts.iter().zip(expect) {

@@ -54,7 +54,11 @@ pub fn load_bytes(bytes: &[u8], password: Option<&str>, limits: &Limits) -> Resu
             let msg = e.to_string();
             let lower = msg.to_ascii_lowercase();
             return Err(if lower.contains("password") || lower.contains("decrypt") {
-                if had_password(password) { LoadError::WrongPassword } else { LoadError::NeedsPassword }
+                if had_password(password) {
+                    LoadError::WrongPassword
+                } else {
+                    LoadError::NeedsPassword
+                }
             } else {
                 LoadError::Corrupt(msg)
             });

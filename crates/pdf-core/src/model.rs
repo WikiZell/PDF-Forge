@@ -87,9 +87,7 @@ impl Project {
 
     fn source_pages(&self, src: usize) -> Result<Vec<PageEntry>, EditError> {
         let s = self.sources.get(src).ok_or(EditError::NoSuchSource(src))?;
-        Ok((0..s.page_count)
-            .map(|page| PageEntry { kind: PageKind::Source { src, page }, rotate: 0 })
-            .collect())
+        Ok((0..s.page_count).map(|page| PageEntry { kind: PageKind::Source { src, page }, rotate: 0 }).collect())
     }
 
     /// Append every page of a source. (Not undoable by itself; used when setting up.)
@@ -286,7 +284,13 @@ mod tests {
         p
     }
     fn order(p: &Project) -> Vec<usize> {
-        p.pages.iter().map(|e| match e.kind { PageKind::Source { page, .. } => page, _ => 99 }).collect()
+        p.pages
+            .iter()
+            .map(|e| match e.kind {
+                PageKind::Source { page, .. } => page,
+                _ => 99,
+            })
+            .collect()
     }
 
     #[test]

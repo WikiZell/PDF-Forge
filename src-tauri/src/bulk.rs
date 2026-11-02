@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use pdf_core::bulk::{
-    self, AnchorFinder, AnchorRect, Date, DateFormat, Job, Occurrence, Outcome, PageSel, Position, Prepared, Rule, Side, StampKind,
-    StampRule,
+    self, AnchorFinder, AnchorRect, Date, DateFormat, Job, Occurrence, Outcome, PageSel, Position, Prepared, Rule,
+    Side, StampKind, StampRule,
 };
 use pdf_core::sign::Mode;
 use serde::{Deserialize, Serialize};
@@ -79,22 +79,51 @@ pub enum PositionField {
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum StampField {
     #[serde(rename = "date", rename_all = "camelCase")]
-    Date { #[serde(default = "iso")] format: String, #[serde(default = "twelve")] font_size: f32, #[serde(default)] offset_x: f32, #[serde(default)] offset_y: f32 },
+    Date {
+        #[serde(default = "iso")]
+        format: String,
+        #[serde(default = "twelve")]
+        font_size: f32,
+        #[serde(default)]
+        offset_x: f32,
+        #[serde(default)]
+        offset_y: f32,
+    },
     #[serde(rename = "text", rename_all = "camelCase")]
-    Text { text: String, #[serde(default = "twelve")] font_size: f32, #[serde(default)] offset_x: f32, #[serde(default)] offset_y: f32 },
+    Text {
+        text: String,
+        #[serde(default = "twelve")]
+        font_size: f32,
+        #[serde(default)]
+        offset_x: f32,
+        #[serde(default)]
+        offset_y: f32,
+    },
 }
 
-fn first() -> String { "first".into() }
-fn right() -> String { "right".into() }
-fn iso() -> String { "iso".into() }
-fn twelve() -> f32 { 12.0 }
+fn first() -> String {
+    "first".into()
+}
+fn right() -> String {
+    "right".into()
+}
+fn iso() -> String {
+    "iso".into()
+}
+fn twelve() -> f32 {
+    12.0
+}
 
 fn bad(msg: impl Into<String>) -> AppError {
     AppError::new("invalid_edit", msg)
 }
 
 fn finite(v: f32, what: &str) -> Result<f32> {
-    if v.is_finite() && v.abs() <= 100_000.0 { Ok(v) } else { Err(bad(format!("{what} is not a valid number."))) }
+    if v.is_finite() && v.abs() <= 100_000.0 {
+        Ok(v)
+    } else {
+        Err(bad(format!("{what} is not a valid number.")))
+    }
 }
 
 /// Validate a rule and convert it to the engine's types.
@@ -112,7 +141,11 @@ pub fn to_rule(r: &RuleFile) -> Result<Rule> {
             "first" => PageSel::First,
             "last" => PageSel::Last,
             "all" => PageSel::All,
-            other => return Err(bad(format!("\"{other}\" is not a valid page selection (use first, last, all or a number)."))),
+            other => {
+                return Err(bad(format!(
+                    "\"{other}\" is not a valid page selection (use first, last, all or a number)."
+                )))
+            }
         },
     };
     let position = match &r.position {
@@ -124,8 +157,17 @@ pub fn to_rule(r: &RuleFile) -> Result<Rule> {
             Position::Anchor {
                 text: text.clone(),
                 match_case: *match_case,
-                occurrence: match occurrence.as_str() { "first" => Occurrence::First, "last" => Occurrence::Last, o => return Err(bad(format!("Unknown occurrence \"{o}\"."))) },
-                side: match side.as_str() { "right" => Side::Right, "below" => Side::Below, "same" => Side::Same, o => return Err(bad(format!("Unknown side \"{o}\"."))) },
+                occurrence: match occurrence.as_str() {
+                    "first" => Occurrence::First,
+                    "last" => Occurrence::Last,
+                    o => return Err(bad(format!("Unknown occurrence \"{o}\"."))),
+                },
+                side: match side.as_str() {
+                    "right" => Side::Right,
+                    "below" => Side::Below,
+                    "same" => Side::Same,
+                    o => return Err(bad(format!("Unknown side \"{o}\"."))),
+                },
                 offset_x: finite(*offset_x, "offsetX")?,
                 offset_y: finite(*offset_y, "offsetY")?,
             }
@@ -134,21 +176,37 @@ pub fn to_rule(r: &RuleFile) -> Result<Rule> {
     let stamp = match &r.stamp {
         None => None,
         Some(StampField::Date { format, font_size, offset_x, offset_y }) => Some(StampRule {
-            kind: StampKind::Date(match format.as_str() { "iso" => DateFormat::Iso, "dmy" => DateFormat::Dmy, "mdy" => DateFormat::Mdy, o => return Err(bad(format!("Unknown date format \"{o}\"."))) }),
-            font_size: stamp_size(*font_size)?, offset_x: finite(*offset_x, "stamp offsetX")?, offset_y: finite(*offset_y, "stamp offsetY")?,
+            kind: StampKind::Date(match format.as_str() {
+                "iso" => DateFormat::Iso,
+                "dmy" => DateFormat::Dmy,
+                "mdy" => DateFormat::Mdy,
+                o => return Err(bad(format!("Unknown date format \"{o}\"."))),
+            }),
+            font_size: stamp_size(*font_size)?,
+            offset_x: finite(*offset_x, "stamp offsetX")?,
+            offset_y: finite(*offset_y, "stamp offsetY")?,
         }),
         Some(StampField::Text { text, font_size, offset_x, offset_y }) => {
             if text.is_empty() || text.chars().count() > 200 {
                 return Err(bad("The stamp text must be 1-200 characters."));
             }
-            Some(StampRule { kind: StampKind::Text(text.clone()), font_size: stamp_size(*font_size)?, offset_x: finite(*offset_x, "stamp offsetX")?, offset_y: finite(*offset_y, "stamp offsetY")? })
+            Some(StampRule {
+                kind: StampKind::Text(text.clone()),
+                font_size: stamp_size(*font_size)?,
+                offset_x: finite(*offset_x, "stamp offsetX")?,
+                offset_y: finite(*offset_y, "stamp offsetY")?,
+            })
         }
     };
     Ok(Rule { width: finite(r.width, "width")?, height: finite(r.height, "height")?, pages, position, stamp })
 }
 
 fn stamp_size(s: f32) -> Result<f32> {
-    if (4.0..=200.0).contains(&s) { Ok(s) } else { Err(bad("Stamp font size must be between 4 and 200 points.")) }
+    if (4.0..=200.0).contains(&s) {
+        Ok(s)
+    } else {
+        Err(bad("Stamp font size must be between 4 and 200 points."))
+    }
 }
 
 /// Parse and validate rule-file JSON (size-limited by the caller).
@@ -163,7 +221,13 @@ pub fn parse_rule(json: &[u8]) -> Result<RuleFile> {
 struct PdfiumFinder;
 
 impl AnchorFinder for PdfiumFinder {
-    fn find(&self, file: &Path, pages: &[usize], text: &str, mc: bool) -> std::result::Result<Vec<(usize, AnchorRect)>, String> {
+    fn find(
+        &self,
+        file: &Path,
+        pages: &[usize],
+        text: &str,
+        mc: bool,
+    ) -> std::result::Result<Vec<(usize, AnchorRect)>, String> {
         let d = pdf_render::Document::open(file, None).map_err(|e| e.to_string())?;
         let mut out = Vec::new();
         for &p in pages {
@@ -191,33 +255,7 @@ fn check_files(state: &AppState, files: &[String]) -> Result<Vec<PathBuf>> {
     if files.len() > 20_000 {
         return Err(bad("Too many files in one batch (limit 20,000)."));
     }
-    files.iter().map(|f| state.allowed.check_readable(Path::new(f), &state.limits).map_err(Into::into)).collect()
-}
-
-fn make_job<'a>(
-    state: &AppState,
-    rule: &RuleFile,
-    files: Vec<PathBuf>,
-    out_dir: PathBuf,
-    workers: usize,
-    today: Date,
-    finder: &'a dyn AnchorFinder,
-) -> Result<Job<'a>> {
-    let dir = signatures::library_dir(state);
-    let list = signatures::library_list(&dir);
-    let content = signatures::content_for(&dir, &list, &rule.signature)?;
-    Ok(Job {
-        files,
-        out_dir,
-        suffix: "_signed".into(),
-        rule: to_rule(rule)?,
-        content,
-        mode: if rule.flatten { Mode::Flatten } else { Mode::Annotate },
-        today,
-        workers,
-        limits: state.limits,
-        finder,
-    })
+    files.iter().map(|f| state.allowed.check_readable(Path::new(f), &state.limits()).map_err(Into::into)).collect()
 }
 
 #[tauri::command]
@@ -228,9 +266,11 @@ pub fn bulk_default_workers() -> usize {
 /// List the PDFs directly inside a user-chosen folder (not recursive). Grants each file.
 #[tauri::command]
 pub async fn bulk_pick_folder(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<String>> {
-    let dir = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok()))
-        .await
-        .map_err(|e| AppError::new("internal", e.to_string()))?;
+    let dir = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok())
+    })
+    .await
+    .map_err(|e| AppError::new("internal", e.to_string()))?;
     let Some(dir) = dir else { return Ok(vec![]) };
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
         .map_err(|e| AppError::new("open_failed", e.to_string()))?
@@ -246,11 +286,17 @@ pub async fn bulk_pick_folder(app: AppHandle, state: State<'_, AppState>) -> Res
 }
 
 #[tauri::command]
-pub async fn bulk_pick_output_dir(app: AppHandle, state: State<'_, AppState>, bulk: State<'_, BulkState>) -> Result<Option<String>> {
+pub async fn bulk_pick_output_dir(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    bulk: State<'_, BulkState>,
+) -> Result<Option<String>> {
     let _ = &state;
-    let dir = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok()))
-        .await
-        .map_err(|e| AppError::new("internal", e.to_string()))?;
+    let dir = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog().file().blocking_pick_folder().and_then(|p| p.into_path().ok())
+    })
+    .await
+    .map_err(|e| AppError::new("internal", e.to_string()))?;
     let Some(dir) = dir else { return Ok(None) };
     let canon = dir.canonicalize().map_err(|e| AppError::new("open_failed", e.to_string()))?;
     *bulk.out_dir.lock().unwrap_or_else(|p| p.into_inner()) = Some(canon.clone());
@@ -277,7 +323,12 @@ pub async fn bulk_rule_load(app: AppHandle) -> Result<Option<RuleFile>> {
 pub async fn bulk_rule_save(app: AppHandle, rule: RuleFile) -> Result<Option<String>> {
     to_rule(&rule)?;
     let picked = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog().file().add_filter("Signing rule", &["json"]).set_file_name("signing-rule.json").blocking_save_file().and_then(|p| p.into_path().ok())
+        app.dialog()
+            .file()
+            .add_filter("Signing rule", &["json"])
+            .set_file_name("signing-rule.json")
+            .blocking_save_file()
+            .and_then(|p| p.into_path().ok())
     })
     .await
     .map_err(|e| AppError::new("internal", e.to_string()))?;
@@ -318,7 +369,7 @@ fn dto(r: &bulk::FileResult) -> ItemDto {
 #[tauri::command]
 pub async fn bulk_preview(rule: RuleFile, files: Vec<String>, state: State<'_, AppState>) -> Result<Vec<ItemDto>> {
     let paths = check_files(&state, &files)?;
-    let limits = state.limits;
+    let limits = state.limits();
     let dir = signatures::library_dir(&state);
     let list = signatures::library_list(&dir);
     let content = signatures::content_for(&dir, &list, &rule.signature)?;
@@ -326,8 +377,16 @@ pub async fn bulk_preview(rule: RuleFile, files: Vec<String>, state: State<'_, A
     let mode = if rule.flatten { Mode::Flatten } else { Mode::Annotate };
     tauri::async_runtime::spawn_blocking(move || {
         let job = Job {
-            files: paths, out_dir: PathBuf::new(), suffix: "_signed".into(), rule: rule_e, content, mode,
-            today: today_utc(), workers: 1, limits, finder: &PdfiumFinder,
+            files: paths,
+            out_dir: PathBuf::new(),
+            suffix: "_signed".into(),
+            rule: rule_e,
+            content,
+            mode,
+            today: today_utc(),
+            workers: 1,
+            limits,
+            finder: &PdfiumFinder,
         };
         Ok(bulk::dry_run(&job).iter().map(dto).collect())
     })
@@ -337,7 +396,8 @@ pub async fn bulk_preview(rule: RuleFile, files: Vec<String>, state: State<'_, A
 
 fn today_utc() -> Date {
     // Civil date from the Unix epoch (Howard Hinnant's algorithm); the UI passes the local date for real runs.
-    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let secs =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
     civil_from_days(secs.div_euclid(86_400))
 }
 
@@ -358,15 +418,23 @@ pub fn civil_from_days(z: i64) -> Date {
 #[tauri::command]
 pub async fn bulk_preview_image(rule: RuleFile, file: String, state: State<'_, AppState>) -> Result<Response> {
     let paths = check_files(&state, &[file])?;
-    let job_inputs = (state.limits, signatures::library_dir(&state));
+    let job_inputs = (state.limits(), signatures::library_dir(&state));
     let list = signatures::library_list(&job_inputs.1);
     let content = signatures::content_for(&job_inputs.1, &list, &rule.signature)?;
     let rule_e = to_rule(&rule)?;
     let mode = if rule.flatten { Mode::Flatten } else { Mode::Annotate };
     let png = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>> {
         let job = Job {
-            files: paths.clone(), out_dir: PathBuf::new(), suffix: "_signed".into(), rule: rule_e, content, mode,
-            today: today_utc(), workers: 1, limits: job_inputs.0, finder: &PdfiumFinder,
+            files: paths.clone(),
+            out_dir: PathBuf::new(),
+            suffix: "_signed".into(),
+            rule: rule_e,
+            content,
+            mode,
+            today: today_utc(),
+            workers: 1,
+            limits: job_inputs.0,
+            finder: &PdfiumFinder,
         };
         match bulk::prepare(&paths[0], &job) {
             Prepared::Ready { bytes, first_page, .. } => {
@@ -420,14 +488,19 @@ pub async fn bulk_run(
     bulk_state: State<'_, BulkState>,
 ) -> Result<u64> {
     let paths = check_files(&state, &files)?;
-    let out_dir = bulk_state.out_dir.lock().unwrap_or_else(|p| p.into_inner()).clone().ok_or_else(|| bad("Choose an output folder first."))?;
+    let out_dir = bulk_state
+        .out_dir
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone()
+        .ok_or_else(|| bad("Choose an output folder first."))?;
     let date = Date { year: today.year, month: today.month.clamp(1, 12), day: today.day.clamp(1, 31) };
     let dir = signatures::library_dir(&state);
     let list = signatures::library_list(&dir);
     let content = signatures::content_for(&dir, &list, &rule.signature)?;
     let rule_e = to_rule(&rule)?;
     let mode = if rule.flatten { Mode::Flatten } else { Mode::Annotate };
-    let limits = state.limits;
+    let limits = state.limits();
 
     let id = bulk_state.next.fetch_add(1, Ordering::Relaxed) + 1;
     let cancel = Arc::new(AtomicBool::new(false));
@@ -435,24 +508,54 @@ pub async fn bulk_run(
 
     std::thread::spawn(move || {
         let job = Job {
-            files: paths, out_dir: out_dir.clone(), suffix: "_signed".into(), rule: rule_e, content, mode, today: date,
-            workers: workers.max(1), limits, finder: &PdfiumFinder,
+            files: paths,
+            out_dir: out_dir.clone(),
+            suffix: "_signed".into(),
+            rule: rule_e,
+            content,
+            mode,
+            today: date,
+            workers: workers.max(1),
+            limits,
+            finder: &PdfiumFinder,
         };
         let app2 = app.clone();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             bulk::run(&job, &cancel, &move |p| {
-                let _ = app2.emit("bulk-progress", ProgressEvent { job_id: id, done: p.done, total: p.total, item: dto(&p.last) });
+                let _ = app2.emit(
+                    "bulk-progress",
+                    ProgressEvent { job_id: id, done: p.done, total: p.total, item: dto(&p.last) },
+                );
             })
         }));
         let finished = match result {
             Ok(Ok(results)) => {
                 let csv = bulk::report_csv(&results);
                 let rp = pdf_core::unique_output_path(&out_dir, "signing-report", "", "csv");
-                let report_path = pdf_core::atomic_write(&rp, csv.as_bytes(), false).ok().map(|_| rp.to_string_lossy().into_owned());
-                FinishedEvent { job_id: id, items: results.iter().map(dto).collect(), report_path, error: None, cancelled: cancel.load(Ordering::Relaxed) }
+                let report_path =
+                    pdf_core::atomic_write(&rp, csv.as_bytes(), false).ok().map(|_| rp.to_string_lossy().into_owned());
+                FinishedEvent {
+                    job_id: id,
+                    items: results.iter().map(dto).collect(),
+                    report_path,
+                    error: None,
+                    cancelled: cancel.load(Ordering::Relaxed),
+                }
             }
-            Ok(Err(e)) => FinishedEvent { job_id: id, items: vec![], report_path: None, error: Some(e.to_string()), cancelled: false },
-            Err(_) => FinishedEvent { job_id: id, items: vec![], report_path: None, error: Some("The job stopped unexpectedly.".into()), cancelled: false },
+            Ok(Err(e)) => FinishedEvent {
+                job_id: id,
+                items: vec![],
+                report_path: None,
+                error: Some(e.to_string()),
+                cancelled: false,
+            },
+            Err(_) => FinishedEvent {
+                job_id: id,
+                items: vec![],
+                report_path: None,
+                error: Some("The job stopped unexpectedly.".into()),
+                cancelled: false,
+            },
         };
         let _ = app.emit("bulk-finished", finished);
         if let Some(b) = app.try_state::<BulkState>() {
@@ -485,7 +588,10 @@ mod tests {
         let r = parse_rule(GOOD.as_bytes()).unwrap();
         let e = to_rule(&r).unwrap();
         assert_eq!(e.pages, PageSel::Last);
-        assert!(matches!(e.position, Position::Anchor { occurrence: Occurrence::First, side: Side::Right, match_case: false, .. }));
+        assert!(matches!(
+            e.position,
+            Position::Anchor { occurrence: Occurrence::First, side: Side::Right, match_case: false, .. }
+        ));
         assert!(matches!(e.stamp, Some(StampRule { kind: StampKind::Date(DateFormat::Dmy), .. })));
         assert!(r.flatten);
     }

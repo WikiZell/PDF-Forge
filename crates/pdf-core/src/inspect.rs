@@ -62,9 +62,12 @@ mod tests {
             });
             kids.push(Object::Reference(page));
         }
-        doc.objects.insert(pages_id, Object::Dictionary(dictionary! {
-            "Type" => "Pages", "Count" => pages as i64, "Kids" => kids,
-        }));
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages", "Count" => pages as i64, "Kids" => kids,
+            }),
+        );
         let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
         doc.trailer.set("Root", catalog);
         doc.save(path).unwrap();

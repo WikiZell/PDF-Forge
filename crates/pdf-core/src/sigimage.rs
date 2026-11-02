@@ -134,7 +134,11 @@ mod tests {
     #[test]
     fn threshold_controls_what_is_kept() {
         let mut im = page_with_ink();
-        for x in 60..70 { for y in 20..30 { im.put_pixel(x, y, Rgba([180, 180, 180, 255])); } } // light grey smudge
+        for x in 60..70 {
+            for y in 20..30 {
+                im.put_pixel(x, y, Rgba([180, 180, 180, 255]));
+            }
+        } // light grey smudge
         let strict = remove_background(&im, 100).unwrap(); // only dark ink survives
         let loose = remove_background(&im, 230).unwrap(); // grey survives too
         assert!(loose.width() > strict.width() + 10, "{} vs {}", loose.width(), strict.width());

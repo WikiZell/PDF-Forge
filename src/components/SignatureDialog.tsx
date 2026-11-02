@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useModal } from "../hooks/useModal";
 import { toAppError } from "../lib/api";
 import * as api from "../lib/sig-api";
 import { useSign } from "../signStore";
@@ -19,6 +20,7 @@ export function SignatureDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { addSignature } = useSign.getState();
+  const dlg = useModal<HTMLDivElement>(onClose);
   const finish = (m: api.SigMeta) => {
     addSignature(m);
     onClose();
@@ -38,9 +40,9 @@ export function SignatureDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-20 grid place-items-center bg-black/40" role="presentation">
       <div
+        ref={dlg}
         role="dialog" aria-modal="true" aria-labelledby="sigdlg-h"
         className="max-h-[90vh] w-[40rem] max-w-[95vw] overflow-auto rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800"
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
       >
         <h2 id="sigdlg-h" className="mb-3 text-lg font-semibold">New signature</h2>
         <div role="tablist" aria-label="Signature source" className="mb-3 flex gap-1 border-b">

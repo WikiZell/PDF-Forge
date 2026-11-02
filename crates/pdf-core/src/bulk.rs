@@ -41,8 +41,18 @@ pub enum Side {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Position {
     /// Top-left corner of the signature box in view space (points, y down).
-    Fixed { x: f32, y: f32 },
-    Anchor { text: String, match_case: bool, occurrence: Occurrence, side: Side, offset_x: f32, offset_y: f32 },
+    Fixed {
+        x: f32,
+        y: f32,
+    },
+    Anchor {
+        text: String,
+        match_case: bool,
+        occurrence: Occurrence,
+        side: Side,
+        offset_x: f32,
+        offset_y: f32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,15 +114,28 @@ pub struct AnchorRect {
 /// Finds text on pages. Implemented with PDFium search in the app.
 pub trait AnchorFinder: Sync {
     /// For each requested 0-based page, hits in reading order as `(page, rect)`.
-    fn find(&self, file: &Path, pages: &[usize], text: &str, match_case: bool) -> Result<Vec<(usize, AnchorRect)>, String>;
+    fn find(
+        &self,
+        file: &Path,
+        pages: &[usize],
+        text: &str,
+        match_case: bool,
+    ) -> Result<Vec<(usize, AnchorRect)>, String>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Outcome {
     /// Signed; `placed` signatures were written to `output`.
-    Signed { output: PathBuf, placed: usize },
-    Skipped { reason: String },
-    Failed { error: String },
+    Signed {
+        output: PathBuf,
+        placed: usize,
+    },
+    Skipped {
+        reason: String,
+    },
+    Failed {
+        error: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -238,7 +261,11 @@ fn build_placements(planned: &[(usize, f32, f32)], rule: &Rule, content: &Conten
 /// Result of applying a rule to one file without writing anything.
 pub enum Prepared {
     /// `first_page` is the first page (0-based) that received a signature.
-    Ready { bytes: Vec<u8>, placed: usize, first_page: usize },
+    Ready {
+        bytes: Vec<u8>,
+        placed: usize,
+        first_page: usize,
+    },
     Skipped(String),
     Failed(String),
 }
@@ -323,7 +350,11 @@ pub struct Progress {
 
 /// Run the job. Results are returned in input order. `cancel` stops picking up new files (files
 /// already being processed finish); unprocessed files are reported as skipped ("cancelled").
-pub fn run(job: &Job<'_>, cancel: &AtomicBool, progress: &(dyn Fn(Progress) + Sync)) -> Result<Vec<FileResult>, JobError> {
+pub fn run(
+    job: &Job<'_>,
+    cancel: &AtomicBool,
+    progress: &(dyn Fn(Progress) + Sync),
+) -> Result<Vec<FileResult>, JobError> {
     if job.suffix.trim().is_empty() {
         return Err(JobError::EmptySuffix);
     }
@@ -388,14 +419,20 @@ pub fn dry_run(job: &Job<'_>) -> Vec<FileResult> {
 fn csv_cell(s: &str) -> String {
     // Neutralise spreadsheet formula injection, then apply RFC 4180 quoting.
     let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) { format!("'{s}") } else { s.to_string() };
-    if s.contains([',', '"', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
+    if s.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s
+    }
 }
 
 pub fn report_csv(results: &[FileResult]) -> String {
     let mut out = String::from("input,status,output,signatures_placed,reason\r\n");
     for r in results {
         let (status, output, placed, reason) = match &r.outcome {
-            Outcome::Signed { output, placed } => ("signed", output.to_string_lossy().into_owned(), placed.to_string(), String::new()),
+            Outcome::Signed { output, placed } => {
+                ("signed", output.to_string_lossy().into_owned(), placed.to_string(), String::new())
+            }
             Outcome::Skipped { reason } => ("skipped", String::new(), String::new(), reason.clone()),
             Outcome::Failed { error } => ("failed", String::new(), String::new(), error.clone()),
         };
@@ -415,11 +452,16 @@ pub fn report_text(results: &[FileResult]) -> String {
     let signed = results.iter().filter(|r| matches!(r.outcome, Outcome::Signed { .. })).count();
     let skipped = results.iter().filter(|r| matches!(r.outcome, Outcome::Skipped { .. })).count();
     let failed = results.len() - signed - skipped;
-    let mut s = format!("Bulk signing report: {signed} signed, {skipped} skipped, {failed} failed ({} files)\n\n", results.len());
+    let mut s = format!(
+        "Bulk signing report: {signed} signed, {skipped} skipped, {failed} failed ({} files)\n\n",
+        results.len()
+    );
     for r in results {
         let name = r.input.to_string_lossy();
         match &r.outcome {
-            Outcome::Signed { output, placed } => s.push_str(&format!("SIGNED   {name} -> {} ({placed} placed)\n", output.display())),
+            Outcome::Signed { output, placed } => {
+                s.push_str(&format!("SIGNED   {name} -> {} ({placed} placed)\n", output.display()))
+            }
             Outcome::Skipped { reason } => s.push_str(&format!("SKIPPED  {name}: {reason}\n")),
             Outcome::Failed { error } => s.push_str(&format!("FAILED   {name}: {error}\n")),
         }

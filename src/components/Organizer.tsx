@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PasswordDialog } from "./PasswordDialog";
+import { useModal } from "../hooks/useModal";
 import { useNear } from "../hooks/useNear";
 import { toAppError } from "../lib/api";
 import * as api from "../lib/organize-api";
@@ -341,6 +342,7 @@ function SplitDialog({ session, onClose }: { session: number; onClose: () => voi
   const [n, setN] = useState(1);
   const [spec, setSpec] = useState("");
   const [busy, setBusy] = useState(false);
+  const dlg = useModal<HTMLFormElement>(onClose);
   const run = async () => {
     setBusy(true);
     try {
@@ -358,10 +360,10 @@ function SplitDialog({ session, onClose }: { session: number; onClose: () => voi
   return (
     <div className="fixed inset-0 z-10 grid place-items-center bg-black/40">
       <form
+        ref={dlg}
         role="dialog" aria-modal="true" aria-labelledby="split-h"
         className="w-[28rem] rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800"
         onSubmit={(e) => { e.preventDefault(); void run(); }}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
       >
         <h2 id="split-h" className="mb-3 text-lg font-semibold">Split document</h2>
         <fieldset className="space-y-2 text-sm">

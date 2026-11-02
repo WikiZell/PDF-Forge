@@ -21,11 +21,17 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 #[derive(Debug)]
 pub enum RenderError {
     /// The PDFium shared library could not be loaded.
-    LibraryMissing { tried: PathBuf, detail: String },
+    LibraryMissing {
+        tried: PathBuf,
+        detail: String,
+    },
     PasswordRequired,
     WrongPassword,
     Open(String),
-    PageOutOfRange { page: usize, page_count: usize },
+    PageOutOfRange {
+        page: usize,
+        page_count: usize,
+    },
     Render(String),
 }
 
@@ -60,19 +66,16 @@ pub fn init(dir: &Path) -> Result<(), RenderError> {
         return Ok(());
     }
     let lib = Pdfium::pdfium_platform_library_name_at_path(dir);
-    let bindings = Pdfium::bind_to_library(&lib).map_err(|e| RenderError::LibraryMissing {
-        tried: lib.clone(),
-        detail: e.to_string(),
-    })?;
+    let bindings = Pdfium::bind_to_library(&lib)
+        .map_err(|e| RenderError::LibraryMissing { tried: lib.clone(), detail: e.to_string() })?;
     let _ = PDFIUM.set(Pdfium::new(bindings));
     Ok(())
 }
 
 fn pdfium() -> Result<&'static Pdfium, RenderError> {
-    PDFIUM.get().ok_or_else(|| RenderError::LibraryMissing {
-        tried: PathBuf::new(),
-        detail: "init() was not called".into(),
-    })
+    PDFIUM
+        .get()
+        .ok_or_else(|| RenderError::LibraryMissing { tried: PathBuf::new(), detail: "init() was not called".into() })
 }
 
 /// Page size in PDF points (1/72 inch), after applying the page rotation.
@@ -131,18 +134,15 @@ pub struct Document {
 
 impl Document {
     pub fn open(path: &Path, password: Option<&str>) -> Result<Self, RenderError> {
-        let doc = pdfium()?
-            .load_pdf_from_file(path, password)
-            .map_err(|e| map_open_error(e, password.is_some()))?;
+        let doc = pdfium()?.load_pdf_from_file(path, password).map_err(|e| map_open_error(e, password.is_some()))?;
         let page_count = doc.pages().len() as usize;
         Ok(Self { inner: Mutex::new(doc), page_count })
     }
 
     /// Open a document held in memory (used to preview unsaved results).
     pub fn from_bytes(bytes: Vec<u8>, password: Option<&str>) -> Result<Self, RenderError> {
-        let doc = pdfium()?
-            .load_pdf_from_byte_vec(bytes, password)
-            .map_err(|e| map_open_error(e, password.is_some()))?;
+        let doc =
+            pdfium()?.load_pdf_from_byte_vec(bytes, password).map_err(|e| map_open_error(e, password.is_some()))?;
         let page_count = doc.pages().len() as usize;
         Ok(Self { inner: Mutex::new(doc), page_count })
     }
@@ -255,17 +255,11 @@ impl Document {
         Ok(hits)
     }
 
-    fn page<'d>(
-        &self,
-        doc: &'d PdfDocument<'static>,
-        page: usize,
-    ) -> Result<PdfPage<'d>, RenderError> {
+    fn page<'d>(&self, doc: &'d PdfDocument<'static>, page: usize) -> Result<PdfPage<'d>, RenderError> {
         if page >= self.page_count {
             return Err(RenderError::PageOutOfRange { page, page_count: self.page_count });
         }
-        doc.pages()
-            .get(page as PdfPageIndex)
-            .map_err(|e| RenderError::Render(e.to_string()))
+        doc.pages().get(page as PdfPageIndex).map_err(|e| RenderError::Render(e.to_string()))
     }
 }
 
@@ -319,11 +313,8 @@ impl ViewMap {
         };
         let (vw, vh) = (p.width().value, p.height().value);
         let (w0, h0) = if rotation == 90 || rotation == 270 { (vh, vw) } else { (vw, vh) };
-        let (ox, oy) = p
-            .boundaries()
-            .bounding()
-            .map(|b| (b.bounds.left().value, b.bounds.bottom().value))
-            .unwrap_or((0.0, 0.0));
+        let (ox, oy) =
+            p.boundaries().bounding().map(|b| (b.bounds.left().value, b.bounds.bottom().value)).unwrap_or((0.0, 0.0));
         Self { rotation, w0, h0, ox, oy }
     }
 

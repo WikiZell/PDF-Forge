@@ -37,13 +37,16 @@ pub fn split_ranges(spec: &str, page_count: usize) -> Result<Vec<SplitPart>, Str
 }
 
 fn range_label(first: usize, last: usize) -> String {
-    if first == last { format!("p{}", first + 1) } else { format!("p{}-{}", first + 1, last + 1) }
+    if first == last {
+        format!("p{}", first + 1)
+    } else {
+        format!("p{}-{}", first + 1, last + 1)
+    }
 }
 
 /// Title and 0-based page index of each top-level bookmark that points at a page.
 pub fn top_level_bookmarks(doc: &Document) -> Vec<(String, usize)> {
-    let page_index: HashMap<ObjectId, usize> =
-        doc.get_pages().values().enumerate().map(|(i, id)| (*id, i)).collect();
+    let page_index: HashMap<ObjectId, usize> = doc.get_pages().values().enumerate().map(|(i, id)| (*id, i)).collect();
     let Some(Ok(root)) = doc.trailer.get(b"Root").ok().map(|o| o.as_reference()) else { return vec![] };
     let Ok(cat) = doc.get_dictionary(root) else { return vec![] };
     let Some(Object::Reference(ol)) = cat.get(b"Outlines").ok() else { return vec![] };

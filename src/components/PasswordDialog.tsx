@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useModal } from "../hooks/useModal";
 
 interface Props {
   fileName: string;
@@ -10,12 +11,12 @@ interface Props {
 /** The password lives only in this component's state and is dropped on close. */
 export function PasswordDialog({ fileName, wrong, onSubmit, onCancel }: Props) {
   const [pw, setPw] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.focus(), []);
+  const dlg = useModal<HTMLFormElement>(onCancel, "#pw");
 
   return (
     <div className="fixed inset-0 z-10 grid place-items-center bg-black/40" role="presentation">
       <form
+        ref={dlg}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pw-title"
@@ -24,14 +25,12 @@ export function PasswordDialog({ fileName, wrong, onSubmit, onCancel }: Props) {
           e.preventDefault();
           onSubmit(pw);
         }}
-        onKeyDown={(e) => e.key === "Escape" && onCancel()}
       >
         <h2 id="pw-title" className="mb-1 text-lg font-semibold">Password required</h2>
         <p className="mb-3 break-all text-sm text-neutral-600 dark:text-neutral-300">{fileName}</p>
         <label className="block text-sm" htmlFor="pw">Password</label>
         <input
           id="pw"
-          ref={input}
           type="password"
           autoComplete="off"
           value={pw}

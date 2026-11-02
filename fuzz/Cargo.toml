@@ -1,0 +1,28 @@
+[package]
+name = "pdf-forge-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pdf-core = { path = "../crates/pdf-core" }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "load_build"
+path = "fuzz_targets/load_build.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "split_ranges"
+path = "fuzz_targets/split_ranges.rs"
+test = false
+doc = false

@@ -94,7 +94,11 @@ pub struct PageGeom {
 impl PageGeom {
     /// Page size as displayed (rotation applied).
     pub fn view_size(&self) -> (f32, f32) {
-        if self.rot % 180 == 0 { (self.w0, self.h0) } else { (self.h0, self.w0) }
+        if self.rot % 180 == 0 {
+            (self.w0, self.h0)
+        } else {
+            (self.h0, self.w0)
+        }
     }
 
     /// View space (top-left origin, rotated) -> PDF user space.
@@ -136,7 +140,9 @@ fn num(o: &Object) -> Option<f32> {
 pub fn page_geom(doc: &Document, page: ObjectId) -> Result<PageGeom, SignError> {
     let boxv = inherited(doc, page, b"CropBox").or_else(|| inherited(doc, page, b"MediaBox"));
     let arr = match &boxv {
-        Some(Object::Array(a)) if a.len() == 4 => a.iter().filter_map(|o| deref(doc, o).and_then(num)).collect::<Vec<_>>(),
+        Some(Object::Array(a)) if a.len() == 4 => {
+            a.iter().filter_map(|o| deref(doc, o).and_then(num)).collect::<Vec<_>>()
+        }
         _ => vec![0.0, 0.0, 612.0, 792.0],
     };
     if arr.len() != 4 {
@@ -190,7 +196,11 @@ fn bbox_in_page(m: &[f32; 6], w: f32, h: f32) -> [f32; 4] {
 fn real(v: f32) -> String {
     let s = format!("{v:.4}");
     let s = s.trim_end_matches('0').trim_end_matches('.');
-    if s.is_empty() || s == "-" || s == "-0" { "0".into() } else { s.to_string() }
+    if s.is_empty() || s == "-" || s == "-0" {
+        "0".into()
+    } else {
+        s.to_string()
+    }
 }
 
 /// Encode text for a WinAnsi Helvetica string. Unsupported characters become '?'.
@@ -251,7 +261,9 @@ fn build_content(
             let mut warn = false;
             let bytes = win_ansi(text, &mut warn);
             if warn {
-                report.warnings.push("Some characters are not supported by the standard font and were replaced with '?'.".into());
+                report
+                    .warnings
+                    .push("Some characters are not supported by the standard font and were replaced with '?'.".into());
             }
             let fs = *font_size;
             let baseline = ((h - fs) / 2.0 + fs * 0.22).max(0.0);
@@ -270,14 +282,27 @@ fn build_content(
             for s in strokes.iter().filter(|s| !s.points.is_empty()) {
                 if s.points.len() == 1 {
                     let (x, y) = map(&s.points[0]);
-                    c.extend_from_slice(format!("{} w {} {} m {} {} l S\n", real(width * sx), real(x), real(y), real(x + 0.01), real(y)).as_bytes());
+                    c.extend_from_slice(
+                        format!(
+                            "{} w {} {} m {} {} l S\n",
+                            real(width * sx),
+                            real(x),
+                            real(y),
+                            real(x + 0.01),
+                            real(y)
+                        )
+                        .as_bytes(),
+                    );
                     continue;
                 }
                 for win in s.points.windows(2) {
                     let (a, b) = (map(&win[0]), map(&win[1]));
                     let pr = (win[0][2] + win[1][2]) / 2.0;
                     let lw = width * sx * (0.45 + 1.1 * pr.clamp(0.0, 1.0));
-                    c.extend_from_slice(format!("{} w {} {} m {} {} l S\n", real(lw), real(a.0), real(a.1), real(b.0), real(b.1)).as_bytes());
+                    c.extend_from_slice(
+                        format!("{} w {} {} m {} {} l S\n", real(lw), real(a.0), real(a.1), real(b.0), real(b.1))
+                            .as_bytes(),
+                    );
                 }
             }
             Ok(Built { content: c, image: None, uses_font: false })
@@ -337,7 +362,10 @@ pub fn apply(doc: &mut Document, placements: &[Placement], mode: Mode) -> Result
     let mut font: Option<ObjectId> = None;
     for (n, p) in placements.iter().enumerate() {
         let page = *pages.get(p.page).ok_or(SignError::PageOutOfRange(p.page))?;
-        if !(p.w.is_finite() && p.h.is_finite() && p.x.is_finite() && p.y.is_finite() && p.rotation.is_finite()) || p.w < 1.0 || p.h < 1.0 {
+        if !(p.w.is_finite() && p.h.is_finite() && p.x.is_finite() && p.y.is_finite() && p.rotation.is_finite())
+            || p.w < 1.0
+            || p.h < 1.0
+        {
             return Err(SignError::BadPlacement(format!("placement {} has an invalid size or position", n + 1)));
         }
         let g = page_geom(doc, page)?;
@@ -373,7 +401,15 @@ fn matrix_obj(m: &[f32; 6]) -> Object {
     Object::Array(m.iter().map(|v| Object::Real(*v)).collect())
 }
 
-fn annotate(doc: &mut Document, page: ObjectId, p: &Placement, m: &[f32; 6], b: Built, res: Dictionary, n: usize) -> Result<(), SignError> {
+fn annotate(
+    doc: &mut Document,
+    page: ObjectId,
+    p: &Placement,
+    m: &[f32; 6],
+    b: Built,
+    res: Dictionary,
+    n: usize,
+) -> Result<(), SignError> {
     let mut form = Dictionary::new();
     form.set("Type", Object::Name(b"XObject".to_vec()));
     form.set("Subtype", Object::Name(b"Form".to_vec()));
@@ -426,7 +462,13 @@ fn annotate(doc: &mut Document, page: ObjectId, p: &Placement, m: &[f32; 6], b: 
         }
         Content::Text { text, font_size, color } => {
             a.set("Subtype", Object::Name(b"FreeText".to_vec()));
-            a.set("DA", Object::String(format!("{} rg /Helv {} Tf", rgb(*color), real(*font_size)).into_bytes(), StringFormat::Literal));
+            a.set(
+                "DA",
+                Object::String(
+                    format!("{} rg /Helv {} Tf", rgb(*color), real(*font_size)).into_bytes(),
+                    StringFormat::Literal,
+                ),
+            );
             let mut warn = false;
             let bytes = win_ansi(text, &mut warn);
             let plain: Vec<u8> = {
@@ -518,11 +560,9 @@ fn flatten(doc: &mut Document, page: ObjectId, m: &[f32; 6], b: Built, res: Dict
     let _ = array; // (kept for symmetry with build.rs helpers)
     let q = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), b"q".to_vec())));
     let big_q = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), b"Q".to_vec())));
-    let mut ours = format!(
-        "q {} {} {} {} {} {} cm\n",
-        real(m[0]), real(m[1]), real(m[2]), real(m[3]), real(m[4]), real(m[5])
-    )
-    .into_bytes();
+    let mut ours =
+        format!("q {} {} {} {} {} {} cm\n", real(m[0]), real(m[1]), real(m[2]), real(m[3]), real(m[4]), real(m[5]))
+            .into_bytes();
     ours.extend_from_slice(&b.content);
     ours.extend_from_slice(b"\nQ");
     let mut os = Stream::new(Dictionary::new(), ours);
@@ -562,7 +602,10 @@ pub mod byte_range {
     /// Write a hex-encoded signature into the placeholder, zero-padded; None if it does not fit.
     pub fn patch(file: &mut [u8], contents_start: usize, contents_end: usize, signature: &[u8]) -> Option<()> {
         let hex_len = contents_end.checked_sub(contents_start)?.checked_sub(2)?; // minus '<' '>'
-        if signature.len() * 2 > hex_len || file.get(contents_end - 1) != Some(&b'>') || file.get(contents_start) != Some(&b'<') {
+        if signature.len() * 2 > hex_len
+            || file.get(contents_end - 1) != Some(&b'>')
+            || file.get(contents_start) != Some(&b'<')
+        {
             return None;
         }
         let mut i = contents_start + 1;

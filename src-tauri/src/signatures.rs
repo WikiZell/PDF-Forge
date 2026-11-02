@@ -82,7 +82,11 @@ fn new_id(dir: &Path) -> String {
 fn clean_name(n: &str) -> String {
     let s: String = n.chars().filter(|c| !c.is_control()).take(60).collect();
     let s = s.trim();
-    if s.is_empty() { "Signature".into() } else { s.to_string() }
+    if s.is_empty() {
+        "Signature".into()
+    } else {
+        s.to_string()
+    }
 }
 
 fn now() -> u64 {
@@ -179,7 +183,8 @@ pub async fn sig_process_import(request: Request<'_>) -> Result<Response> {
     let threshold: u8 = header(&request, "threshold").and_then(|t| t.parse().ok()).unwrap_or(200);
     let out = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>> {
         let img = pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?;
-        let cut = pdf_core::sigimage::remove_background(&img, threshold).map_err(|e| AppError::new("invalid_edit", e.to_string()))?;
+        let cut = pdf_core::sigimage::remove_background(&img, threshold)
+            .map_err(|e| AppError::new("invalid_edit", e.to_string()))?;
         Ok(pdf_core::sigimage::encode_png(&cut))
     })
     .await
@@ -267,7 +272,10 @@ pub struct PlacementDto {
 
 /// Content for a library signature (used by bulk signing).
 pub fn content_for(dir: &Path, list: &[SigMeta], id: &str) -> Result<Content> {
-    let m = list.iter().find(|m| m.id == id).ok_or_else(|| AppError::new("invalid_edit", "The signature in this rule is no longer in the library."))?;
+    let m = list
+        .iter()
+        .find(|m| m.id == id)
+        .ok_or_else(|| AppError::new("invalid_edit", "The signature in this rule is no longer in the library."))?;
     match &m.drawn {
         Some(d) => Ok(Content::Ink {
             strokes: d.strokes.iter().map(|s| Stroke { points: s.clone() }).collect(),
@@ -280,7 +288,9 @@ pub fn content_for(dir: &Path, list: &[SigMeta], id: &str) -> Result<Content> {
                 return Err(AppError::new("not_allowed", "Invalid signature id."));
             }
             let bytes = std::fs::read(dir.join(format!("{id}.png"))).map_err(io)?;
-            Ok(Content::Image(pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?))
+            Ok(Content::Image(
+                pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?,
+            ))
         }
     }
 }
@@ -300,10 +310,17 @@ pub fn to_placement(dir: &Path, list: &[SigMeta], p: &PlacementDto) -> Result<Pl
         if t.is_empty() {
             return Err(AppError::new("invalid_edit", "A text field is empty."));
         }
-        Content::Text { text: t.chars().take(500).collect(), font_size: p.font_size.unwrap_or(12.0).clamp(4.0, 200.0), color: [0.0, 0.0, 0.0] }
+        Content::Text {
+            text: t.chars().take(500).collect(),
+            font_size: p.font_size.unwrap_or(12.0).clamp(4.0, 200.0),
+            color: [0.0, 0.0, 0.0],
+        }
     } else {
         let id = p.sig_id.as_deref().ok_or_else(|| AppError::new("invalid_edit", "Missing signature."))?;
-        let m = list.iter().find(|m| m.id == id).ok_or_else(|| AppError::new("invalid_edit", "A placed signature was deleted from the library."))?;
+        let m = list
+            .iter()
+            .find(|m| m.id == id)
+            .ok_or_else(|| AppError::new("invalid_edit", "A placed signature was deleted from the library."))?;
         match &m.drawn {
             Some(d) => Content::Ink {
                 strokes: d.strokes.iter().map(|s| Stroke { points: s.clone() }).collect(),
@@ -313,7 +330,9 @@ pub fn to_placement(dir: &Path, list: &[SigMeta], p: &PlacementDto) -> Result<Pl
             },
             None => {
                 let bytes = std::fs::read(dir.join(format!("{id}.png"))).map_err(io)?;
-                Content::Image(pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?)
+                Content::Image(
+                    pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?,
+                )
             }
         }
     };
@@ -341,13 +360,18 @@ pub async fn sign_document(
     if placements.is_empty() {
         return Err(AppError::new("invalid_edit", "Nothing has been placed yet."));
     }
-    let canon = state.allowed.check_readable(Path::new(&path), &state.limits)?;
-    let limits = state.limits;
+    let canon = state.allowed.check_readable(Path::new(&path), &state.limits())?;
+    let limits = state.limits();
     let dir = lib_dir(&state);
     let stem = canon.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "document".into());
     let default = pdf_core::sanitize_file_name(&format!("{stem}_signed.pdf"));
     let picked = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog().file().add_filter("PDF documents", &["pdf"]).set_file_name(&default).blocking_save_file().and_then(|p| p.into_path().ok())
+        app.dialog()
+            .file()
+            .add_filter("PDF documents", &["pdf"])
+            .set_file_name(&default)
+            .blocking_save_file()
+            .and_then(|p| p.into_path().ok())
     })
     .await
     .map_err(|e| AppError::new("internal", e.to_string()))?;
@@ -356,12 +380,19 @@ pub async fn sign_document(
         out.set_extension("pdf");
     }
     if out == canon {
-        return Err(AppError::new("save_failed", "Choose a different file name: the original is never overwritten by signing."));
+        return Err(AppError::new(
+            "save_failed",
+            "Choose a different file name: the original is never overwritten by signing.",
+        ));
     }
     let res = tauri::async_runtime::spawn_blocking(move || -> Result<SignedResult> {
         let mut doc = pdf_core::load_file(&canon, password.as_deref(), &limits).map_err(|e| {
             use pdf_core::LoadError::*;
-            let code = match &e { NeedsPassword => "password_required", WrongPassword => "wrong_password", _ => "open_failed" };
+            let code = match &e {
+                NeedsPassword => "password_required",
+                WrongPassword => "wrong_password",
+                _ => "open_failed",
+            };
             AppError::new(code, e.to_string())
         })?;
         let list = read_index(&dir);
@@ -400,21 +431,48 @@ mod tests {
 
     fn meta(id: &str, drawn: bool) -> SigMeta {
         SigMeta {
-            id: id.into(), name: "n".into(), kind: if drawn { "drawn" } else { "typed" }.into(), created: 0, aspect: 2.0,
-            drawn: drawn.then(|| Drawn { strokes: vec![vec![[0.0, 0.0, 0.5], [1.0, 1.0, 0.5]]], view: [10.0, 5.0], width: 2.0, color: [0.0; 3] }),
-            text: None, font: None,
+            id: id.into(),
+            name: "n".into(),
+            kind: if drawn { "drawn" } else { "typed" }.into(),
+            created: 0,
+            aspect: 2.0,
+            drawn: drawn.then(|| Drawn {
+                strokes: vec![vec![[0.0, 0.0, 0.5], [1.0, 1.0, 0.5]]],
+                view: [10.0, 5.0],
+                width: 2.0,
+                color: [0.0; 3],
+            }),
+            text: None,
+            font: None,
         }
     }
     fn dto(kind: &str, sig: Option<&str>, text: Option<&str>) -> PlacementDto {
-        PlacementDto { page: 0, x: 1.0, y: 1.0, w: 50.0, h: 20.0, rotation: 0.0, kind: kind.into(), sig_id: sig.map(Into::into), text: text.map(Into::into), font_size: Some(12.0) }
+        PlacementDto {
+            page: 0,
+            x: 1.0,
+            y: 1.0,
+            w: 50.0,
+            h: 20.0,
+            rotation: 0.0,
+            kind: kind.into(),
+            sig_id: sig.map(Into::into),
+            text: text.map(Into::into),
+            font_size: Some(12.0),
+        }
     }
 
     #[test]
     fn placements_resolve_drawn_text_and_reject_bad_references() {
         let dir = std::env::temp_dir().join("pf-sigtest-none");
         let list = vec![meta("abc123", true)];
-        assert!(matches!(to_placement(&dir, &list, &dto("signature", Some("abc123"), None)).unwrap().content, Content::Ink { .. }));
-        assert!(matches!(to_placement(&dir, &list, &dto("text", None, Some("hi"))).unwrap().content, Content::Text { .. }));
+        assert!(matches!(
+            to_placement(&dir, &list, &dto("signature", Some("abc123"), None)).unwrap().content,
+            Content::Ink { .. }
+        ));
+        assert!(matches!(
+            to_placement(&dir, &list, &dto("text", None, Some("hi"))).unwrap().content,
+            Content::Text { .. }
+        ));
         assert!(to_placement(&dir, &list, &dto("text", None, Some(""))).is_err());
         assert!(to_placement(&dir, &list, &dto("signature", Some("missing"), None)).is_err());
         assert!(to_placement(&dir, &list, &dto("signature", None, None)).is_err());

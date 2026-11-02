@@ -82,3 +82,7 @@ export const forgetRecent = (path: string) => invoke<void>("forget_recent", { pa
 export const saveViewState = (path: string, view: ViewStateDto) =>
   invoke<void>("save_view_state", { path, view });
 export const clearAppData = () => invoke<void>("clear_app_data");
+
+export interface Settings { maxFileSizeMb: number; maxPages: number }
+export const getSettings = () => invoke<Settings>("get_settings");
+export const setSettings = (settings: Settings) => invoke<Settings>("set_settings", { settings });

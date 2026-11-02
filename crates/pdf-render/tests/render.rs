@@ -122,10 +122,7 @@ fn outline_is_flattened_with_depth_and_pages() {
     let Some(doc) = text_doc() else { return };
     let o = doc.outline();
     let got: Vec<_> = o.iter().map(|i| (i.title.as_str(), i.depth, i.page)).collect();
-    assert_eq!(
-        got,
-        vec![("Chapter 1", 0, Some(0)), ("Section 1.1", 1, Some(2)), ("Chapter 2", 0, Some(1))]
-    );
+    assert_eq!(got, vec![("Chapter 1", 0, Some(0)), ("Section 1.1", 1, Some(2)), ("Chapter 2", 0, Some(1))]);
 }
 
 #[test]

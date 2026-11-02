@@ -4,6 +4,7 @@ import { BulkSign } from "./components/BulkSign";
 import { Organizer } from "./components/Organizer";
 import { pickPdfs } from "./lib/organize-api";
 import { useOrganizer } from "./organizerStore";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { SignPanel } from "./components/SignPanel";
 import { useSign } from "./signStore";
 import { Sidebar } from "./components/Sidebar";
@@ -25,6 +26,8 @@ export function App() {
   const org = useOrganizer();
   const sign = useSign();
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recentKey, setRecentKey] = useState(0);
   const [libError, setLibError] = useState<string | null>(null);
   const [wrongPw, setWrongPw] = useState(false);
 
@@ -130,6 +133,7 @@ export function App() {
         onPrint={print}
         onOrganize={() => v.doc && org.start([v.doc.path])}
         onBulk={() => setBulkOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
         onMerge={async () => {
           const paths = await pickPdfs().catch(() => []);
           if (paths.length) await org.start(paths);
@@ -157,8 +161,10 @@ export function App() {
           {sign.active && <SignPanel />}
         </div>
       ) : (
-        <Welcome onOpenRecent={openFromRecent} />
+        <Welcome key={recentKey} onOpenRecent={openFromRecent} />
       )}
+
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} onCleared={() => setRecentKey((k) => k + 1)} />}
 
       {v.pendingPasswordPath && (
         <PasswordDialog

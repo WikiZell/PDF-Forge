@@ -28,15 +28,46 @@ pub struct ViewState {
     pub touched: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Settings {
+    /// Largest PDF the app will open, in megabytes.
+    pub max_file_size_mb: u64,
+    pub max_pages: usize,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { max_file_size_mb: 2048, max_pages: 100_000 }
+    }
+}
+
+impl Settings {
+    pub const MAX_FILE_SIZE_MB: u64 = 16_384;
+    pub const MAX_PAGES: usize = 1_000_000;
+
+    /// Reject values outside sane bounds rather than clamping silently.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(1..=Self::MAX_FILE_SIZE_MB).contains(&self.max_file_size_mb) {
+            return Err(format!("Maximum file size must be between 1 and {} MB.", Self::MAX_FILE_SIZE_MB));
+        }
+        if !(1..=Self::MAX_PAGES).contains(&self.max_pages) {
+            return Err(format!("Maximum page count must be between 1 and {}.", Self::MAX_PAGES));
+        }
+        Ok(())
+    }
+
+    pub fn limits(&self) -> pdf_core::Limits {
+        pdf_core::Limits { max_file_size: self.max_file_size_mb * 1024 * 1024, max_pages: self.max_pages }
+    }
+}
+
 pub struct Storage {
     dir: PathBuf,
 }
 
 fn now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 impl Storage {
@@ -50,16 +81,26 @@ impl Storage {
     }
 
     fn read<T: for<'de> Deserialize<'de> + Default>(&self, file: &str) -> T {
-        std::fs::read(self.dir.join(file))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default()
+        std::fs::read(self.dir.join(file)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
     }
 
     fn write<T: Serialize>(&self, file: &str, v: &T) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.dir)?;
         let bytes = serde_json::to_vec_pretty(v).map_err(std::io::Error::other)?;
         pdf_core::atomic_write(&self.dir.join(file), &bytes, false)
+    }
+
+    pub fn settings(&self) -> Settings {
+        let s: Settings = self.read("settings.json");
+        if s.validate().is_ok() {
+            s
+        } else {
+            Settings::default()
+        }
+    }
+
+    pub fn save_settings(&self, s: &Settings) -> std::io::Result<()> {
+        self.write("settings.json", s)
     }
 
     pub fn recent(&self) -> Vec<RecentFile> {
@@ -142,13 +183,29 @@ mod tests {
     fn view_state_roundtrip_and_corrupt_file_is_ignored() {
         let s = store("view");
         assert!(s.view_state("/a.pdf").is_none());
-        s.save_view_state("/a.pdf", ViewState { page: 7, zoom: "150".into(), layout: "continuous".into(), touched: 0 }).unwrap();
+        s.save_view_state("/a.pdf", ViewState { page: 7, zoom: "150".into(), layout: "continuous".into(), touched: 0 })
+            .unwrap();
         let v = s.view_state("/a.pdf").unwrap();
         assert_eq!((v.page, v.zoom.as_str()), (7, "150"));
         std::fs::write(s.dir().join("view_state.json"), b"{not json").unwrap();
         assert!(s.view_state("/a.pdf").is_none());
         s.save_view_state("/b.pdf", ViewState::default()).unwrap(); // recovers
         assert!(s.view_state("/b.pdf").is_some());
+    }
+
+    #[test]
+    fn settings_default_validate_persist_and_reject_garbage() {
+        let s = store("settings");
+        assert_eq!(s.settings(), Settings::default());
+        let custom = Settings { max_file_size_mb: 100, max_pages: 50 };
+        s.save_settings(&custom).unwrap();
+        assert_eq!(s.settings(), custom);
+        assert_eq!(custom.limits().max_file_size, 100 * 1024 * 1024);
+        assert!(Settings { max_file_size_mb: 0, max_pages: 10 }.validate().is_err());
+        assert!(Settings { max_file_size_mb: 10, max_pages: 0 }.validate().is_err());
+        assert!(Settings { max_file_size_mb: 999_999, max_pages: 10 }.validate().is_err());
+        std::fs::write(s.dir().join("settings.json"), br#"{"maxFileSizeMb": 0}"#).unwrap();
+        assert_eq!(s.settings(), Settings::default(), "invalid stored values fall back to defaults");
     }
 
     #[test]

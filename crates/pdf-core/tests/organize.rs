@@ -70,7 +70,9 @@ fn delete_drops_links_and_bookmarks_to_removed_pages_but_keeps_children() {
     assert_eq!(l[2], [], "link from P2 to deleted P3 removed");
     assert_eq!(rep.dropped_links, 3);
     // no page-less leftovers: every outline/link target resolves to a page in the output
-    for (_, _, t) in bookmarks(&d) { assert!(t.is_some()); }
+    for (_, _, t) in bookmarks(&d) {
+        assert!(t.is_some());
+    }
 }
 
 #[test]
@@ -86,11 +88,17 @@ fn deleting_a_parent_bookmark_page_promotes_its_children() {
 fn rotate_composes_with_existing_rotation() {
     let mut src = make_pdf("A", 2, false);
     let first = *src.get_pages().values().next().unwrap();
-    if let Some(lopdf::Object::Dictionary(d)) = src.objects.get_mut(&first) { d.set("Rotate", 90); }
+    if let Some(lopdf::Object::Dictionary(d)) = src.objects.get_mut(&first) {
+        d.set("Rotate", 90);
+    }
     let mut p = project_of(vec![("a.pdf", src)]);
     p.rotate(&[0, 1], 90).unwrap();
     let (d, _) = out(&p, None);
-    let rot: Vec<i64> = d.get_pages().values().map(|&id| d.get_dictionary(id).unwrap().get(b"Rotate").ok().and_then(|o| o.as_i64().ok()).unwrap_or(0)).collect();
+    let rot: Vec<i64> = d
+        .get_pages()
+        .values()
+        .map(|&id| d.get_dictionary(id).unwrap().get(b"Rotate").ok().and_then(|o| o.as_i64().ok()).unwrap_or(0))
+        .collect();
     assert_eq!(rot, [180, 90]);
 }
 
@@ -117,7 +125,17 @@ fn blank_pages_have_requested_size() {
     let (d, _) = out(&p, None);
     assert_eq!(markers(&d), ["", "A-P0", "", "A-P1"]);
     let pages: Vec<_> = d.get_pages().values().copied().collect();
-    let mb = |i: usize| -> Vec<f32> { d.get_dictionary(pages[i]).unwrap().get(b"MediaBox").unwrap().as_array().unwrap().iter().map(|o| o.as_float().unwrap()).collect() };
+    let mb = |i: usize| -> Vec<f32> {
+        d.get_dictionary(pages[i])
+            .unwrap()
+            .get(b"MediaBox")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o.as_float().unwrap())
+            .collect()
+    };
     assert_eq!(mb(0)[2..], [612.0, 792.0]);
     assert!((mb(2)[2] - 595.276).abs() < 0.01 && (mb(2)[3] - 841.89).abs() < 0.01);
 }
@@ -162,12 +180,18 @@ fn merge_renames_colliding_form_fields_and_reports_every_rename() {
     let mut names = field_names(&d);
     names.sort();
     assert_eq!(names, ["email", "email_2", "email_3", "name", "name_2", "name_3"]);
-    let mut r: Vec<_> = rep.renamed_fields.iter().map(|r| (r.source.as_str(), r.from.as_str(), r.to.as_str())).collect();
+    let mut r: Vec<_> =
+        rep.renamed_fields.iter().map(|r| (r.source.as_str(), r.from.as_str(), r.to.as_str())).collect();
     r.sort();
-    assert_eq!(r, [
-        ("b.pdf", "email", "email_2"), ("b.pdf", "name", "name_2"),
-        ("c.pdf", "email", "email_3"), ("c.pdf", "name", "name_3"),
-    ]);
+    assert_eq!(
+        r,
+        [
+            ("b.pdf", "email", "email_2"),
+            ("b.pdf", "name", "name_2"),
+            ("c.pdf", "email", "email_3"),
+            ("c.pdf", "name", "name_3"),
+        ]
+    );
 }
 
 #[test]

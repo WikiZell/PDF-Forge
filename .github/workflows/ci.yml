@@ -8,26 +8,61 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   test:
-    name: Test (Linux, core + frontend)
+    name: Test (Linux: core, frontend, E2E)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      # Core crates are UI-free, so they build without WebKit.
+      - name: Frontend E2E (mocked IPC)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - run: cargo fmt --all --check
+      - name: Licence inventory is current and has no disallowed licences
+        run: npm run licenses:check
       - run: node scripts/fetch-pdfium.mjs linux-x64
-      - name: Rust tests (pdf-core, pdf-render with real PDFium)
+      - name: Rust tests with real PDFium (core + render)
         run: cargo test -p pdf-core -p pdf-render --locked -- --test-threads=1
         env:
           PDFIUM_DIR: ${{ github.workspace }}/src-tauri/resources/pdfium
           PDFIUM_REQUIRED: "1"
+          FUZZ_ITERS: "5000"
+      - name: Performance smoke (1,000 pages)
+        run: cargo test --release -p pdf-core --test perf --locked -- --nocapture
+        env:
+          PDFIUM_DIR: ${{ github.workspace }}/src-tauri/resources/pdfium
+      - name: Tauri crate compiles and its unit tests pass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev
+          npm run build
+          cargo clippy -p pdf-core -p pdf-render -p pdf-forge --locked -- -D warnings
+          cargo test -p pdf-forge --locked
+
+  fuzz:
+    name: Fuzz (short run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - run: |
+          cd fuzz
+          mkdir -p corpus/load_build && cp ../tests/fixtures/*.pdf corpus/load_build/
+          cargo fuzz run load_build -- -max_total_time=120 -rss_limit_mb=2048
+          cargo fuzz run split_ranges -- -max_total_time=30
 
   windows:
     name: Build Windows installers (unsigned)
@@ -48,8 +83,8 @@ jobs:
       - name: Build MSI + NSIS
         run: npx tauri build
         env:
-          # Authenticode hook: set repo secrets and flip SIGN_WINDOWS to "true" once a certificate exists.
-          # Signing config (certificateThumbprint / signCommand) goes in tauri.conf.json bundle.windows.
+          # Authenticode hook: once a certificate exists, add repo secrets and set
+          # bundle.windows.certificateThumbprint / signCommand in tauri.conf.json (see docs/RELEASING.md).
           SIGN_WINDOWS: "false"
       - uses: actions/upload-artifact@v4
         with:
