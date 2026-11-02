@@ -15,10 +15,17 @@ publishing (fixed with temp file + hard link, `write_new_atomic`).
 CI also caught that the workflow YAML itself was invalid (unquoted colon in a job name), which meant
 CI had never run; fixed.
 
-**Still not done (needs a person at a Windows desktop):** installing and *launching* the installers
-and the GUI on WebView2; opening signed/merged output in Acrobat Reader and Chrome; high-DPI
-(100–200 %); a real screen-reader pass; seeing bulk progress in a real window. These are the
-checklist in docs/MANUAL-QA.md. The installers have never been executed.
+**Installed app on a real Windows desktop (CI job "Windows smoke", run 41490630260):** the NSIS installer
+installed silently per user (no admin) to `%LOCALAPPDATA%\PDF Forge\pdf-forge.exe`; the installed app
+was launched on three PDFs (merged/reordered, signed with annotations, signed flattened) on a Windows 11
+desktop with WebView2, stayed running, and desktop screenshots show the "PDF Forge" window rendering
+them correctly (signature image, ink stroke, text, thumbnails, 5-page merged document with a rotated
+page). The `windows-smoke` branch holds those screenshots and sample PDFs.
+
+**Still not done (needs a person at a Windows desktop):** interactive use of the installed app (clicking
+through dialogs, drag-reorder, signing, bulk run); opening signed/merged output in **Acrobat Reader**
+(Chrome rendering was attempted in CI but its screenshots were not inspected); high-DPI
+(100–200 %); a real screen-reader pass; the MSI was built but never installed. See docs/MANUAL-QA.md.
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
