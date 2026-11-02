@@ -1,7 +1,8 @@
 import { chromium, expect, test, type Browser, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const APP = process.env.APP_EXE!;
 const SAMPLES = process.env.SAMPLES_DIR!;
@@ -221,7 +222,7 @@ test("accessibility tree of the real app exposes the expected landmarks and name
 import { execFileSync, spawn as spawnProc } from "node:child_process";
 import { existsSync, readFileSync, statSync, rmSync } from "node:fs";
 
-const HERE = __dirname;
+const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(SHOTS, "app-output");
 
 /** Types `text` + Enter into whichever native dialog opens within `delayMs`. */
