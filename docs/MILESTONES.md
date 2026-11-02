@@ -22,10 +22,22 @@ desktop with WebView2, stayed running, and desktop screenshots show the "PDF For
 them correctly (signature image, ink stroke, text, thumbnails, 5-page merged document with a rotated
 page). The `windows-smoke` branch holds those screenshots and sample PDFs.
 
-**Still not done (needs a person at a Windows desktop):** interactive use of the installed app (clicking
-through dialogs, drag-reorder, signing, bulk run); opening signed/merged output in **Acrobat Reader**
-(Chrome rendering was attempted in CI but its screenshots were not inspected); high-DPI
-(100–200 %); a real screen-reader pass; the MSI was built but never installed. See docs/MANUAL-QA.md.
+**Interactive E2E against the real installed app on Windows (CI, `e2e-real/`, all 7 pass):** Playwright
+attaches to the installed app's WebView2 over CDP (enabled on the CI runner only via the WebView2 policy
+registry key; the product has no debug port), so every click goes through the real Rust backend, real
+PDFium and real storage. Covered: open from the command line with page bitmaps and thumbnails really
+rendered; no network requests leave the app; text search with highlights (incl. a rotated page),
+bookmarks, zoom, layouts; the page organiser (select, rotate, delete, undo, real output preview);
+drawing a signature into the real library, placing it and a date field, Settings validation and
+clear-all-data; layout at 100/125/150/200 % scaling; accessibility-tree structure. Looking at the 200 %
+screenshot found a real usability problem (page area squeezed to ~110 px with two side panels open),
+fixed by hiding the thumbnail sidebar on narrow windows while Fill & Sign is open, now asserted by the test.
+
+**Still not done:** anything behind native dialogs (Open/Save/folder pickers, Print) was not driven
+interactively on Windows (Playwright cannot); opening output in **Acrobat Reader** (Chrome headless did not
+render the PDFs, so no independent-viewer comparison exists); a real screen-reader pass (only the ARIA
+structure/names were checked); installing the MSI (built, never installed); a heavy real-world 1,000-page
+scan. See docs/MANUAL-QA.md.
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real

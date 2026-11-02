@@ -11,6 +11,7 @@ Run on Windows 10 and 11 against the installer from CI. Record what you observe.
 - [ ] Encrypted source (password) → output opens without a password.
 
 ## High DPI (100 %, 125 %, 150 %, 200 %)
+_Automated on the real Windows app via CDP device-metrics emulation (no overflow, toolbar not clipped, page area >= 260 px); still worth a look on a real scaled display._
 - [ ] Text, thumbnails and the page render crisp (PDFium is rendered at devicePixelRatio).
 - [ ] Toolbar wraps, nothing is clipped; dialogs fit the screen at 200 %.
 - [ ] Drag-reorder and signature handles hit correctly (pointer coordinates are CSS px).
