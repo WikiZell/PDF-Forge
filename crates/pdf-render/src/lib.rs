@@ -138,6 +138,15 @@ impl Document {
         Ok(Self { inner: Mutex::new(doc), page_count })
     }
 
+    /// Open a document held in memory (used to preview unsaved results).
+    pub fn from_bytes(bytes: Vec<u8>, password: Option<&str>) -> Result<Self, RenderError> {
+        let doc = pdfium()?
+            .load_pdf_from_byte_vec(bytes, password)
+            .map_err(|e| map_open_error(e, password.is_some()))?;
+        let page_count = doc.pages().len() as usize;
+        Ok(Self { inner: Mutex::new(doc), page_count })
+    }
+
     pub fn page_count(&self) -> usize {
         self.page_count
     }
@@ -211,22 +220,36 @@ impl Document {
         if query.is_empty() {
             return Ok(vec![]);
         }
-        let doc = self.inner.lock().unwrap_or_else(|p| p.into_inner());
-        let opts = PdfSearchOptions::new().match_case(match_case);
         let mut hits = Vec::new();
         for i in 0..self.page_count {
-            let p = self.page(&doc, i)?;
-            let map = ViewMap::new(&p);
-            let Ok(text) = p.text() else { continue };
-            let Ok(search) = text.search(query, &opts) else { continue };
-            while let Some(segs) = search.find_next() {
-                let rects: Vec<Rect> = segs.iter().map(|s| map.rect(s.bounds())).collect();
-                if !rects.is_empty() {
-                    hits.push(SearchHit { page: i, rects });
-                }
-                if hits.len() >= MAX_SEARCH_HITS {
-                    return Ok(hits);
-                }
+            hits.extend(self.search_page(i, query, match_case)?);
+            if hits.len() >= MAX_SEARCH_HITS {
+                hits.truncate(MAX_SEARCH_HITS);
+                break;
+            }
+        }
+        Ok(hits)
+    }
+
+    /// Search a single page (0-based). Hits are in reading order as PDFium reports them.
+    pub fn search_page(&self, page: usize, query: &str, match_case: bool) -> Result<Vec<SearchHit>, RenderError> {
+        if query.is_empty() {
+            return Ok(vec![]);
+        }
+        let doc = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let opts = PdfSearchOptions::new().match_case(match_case);
+        let p = self.page(&doc, page)?;
+        let map = ViewMap::new(&p);
+        let mut hits = Vec::new();
+        let Ok(text) = p.text() else { return Ok(hits) };
+        let Ok(search) = text.search(query, &opts) else { return Ok(hits) };
+        while let Some(segs) = search.find_next() {
+            let rects: Vec<Rect> = segs.iter().map(|s| map.rect(s.bounds())).collect();
+            if !rects.is_empty() {
+                hits.push(SearchHit { page, rects });
+            }
+            if hits.len() >= MAX_SEARCH_HITS {
+                break;
             }
         }
         Ok(hits)

@@ -1,3 +1,4 @@
+mod bulk;
 mod commands;
 mod error;
 mod organize;
@@ -41,6 +42,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(signatures::SigLock::default())
+        .manage(bulk::BulkState::default())
         .setup(|app| {
             let app_data = app.path().app_data_dir().ok();
             let storage = storage::Storage::new(app_data.clone().unwrap_or_else(|| std::env::temp_dir().join("PDF Forge")));
@@ -105,6 +107,15 @@ pub fn run() {
             signatures::sig_rename,
             signatures::sig_delete,
             signatures::sign_document,
+            bulk::bulk_default_workers,
+            bulk::bulk_pick_folder,
+            bulk::bulk_pick_output_dir,
+            bulk::bulk_rule_load,
+            bulk::bulk_rule_save,
+            bulk::bulk_preview,
+            bulk::bulk_preview_image,
+            bulk::bulk_run,
+            bulk::bulk_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PDF Forge");

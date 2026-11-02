@@ -265,6 +265,34 @@ pub struct PlacementDto {
     pub font_size: Option<f32>,
 }
 
+/// Content for a library signature (used by bulk signing).
+pub fn content_for(dir: &Path, list: &[SigMeta], id: &str) -> Result<Content> {
+    let m = list.iter().find(|m| m.id == id).ok_or_else(|| AppError::new("invalid_edit", "The signature in this rule is no longer in the library."))?;
+    match &m.drawn {
+        Some(d) => Ok(Content::Ink {
+            strokes: d.strokes.iter().map(|s| Stroke { points: s.clone() }).collect(),
+            view: (d.view[0], d.view[1]),
+            width: d.width,
+            color: d.color,
+        }),
+        None => {
+            if !id.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(AppError::new("not_allowed", "Invalid signature id."));
+            }
+            let bytes = std::fs::read(dir.join(format!("{id}.png"))).map_err(io)?;
+            Ok(Content::Image(pdf_core::sigimage::decode(&bytes).map_err(|e| AppError::new("open_failed", e.to_string()))?))
+        }
+    }
+}
+
+pub fn library_dir(state: &AppState) -> PathBuf {
+    lib_dir(state)
+}
+
+pub fn library_list(dir: &Path) -> Vec<SigMeta> {
+    read_index(dir)
+}
+
 /// Resolve a placement into pdf-core content using the library on disk.
 pub fn to_placement(dir: &Path, list: &[SigMeta], p: &PlacementDto) -> Result<Placement> {
     let content = if p.kind == "text" {

@@ -5,6 +5,7 @@
 //! engine arrive in later milestones.
 
 pub mod build;
+pub mod bulk;
 pub mod fs_safety;
 pub mod inspect;
 pub mod load;

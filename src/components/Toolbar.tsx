@@ -9,6 +9,7 @@ interface Props {
   onPrint: () => void;
   onOrganize: () => void;
   onMerge: () => void;
+  onBulk: () => void;
 }
 
 const LAYOUTS: { id: Layout; label: string }[] = [
@@ -17,7 +18,7 @@ const LAYOUTS: { id: Layout; label: string }[] = [
   { id: "two-page", label: "Two pages" },
 ];
 
-export function Toolbar({ onOpen, onPrint, onOrganize, onMerge }: Props) {
+export function Toolbar({ onOpen, onPrint, onOrganize, onMerge, onBulk }: Props) {
   const v = useViewer();
   const orgActive = useOrganizer((s) => s.active);
   const signing = useSign((s) => s.active);
@@ -30,6 +31,7 @@ export function Toolbar({ onOpen, onPrint, onOrganize, onMerge }: Props) {
         Open…
       </button>
       <button className={btn} onClick={onMerge} disabled={v.busy}>Merge PDFs…</button>
+      <button className={btn} onClick={onBulk}>Bulk sign…</button>
       {doc && (
         <>
           <button className={btn} onClick={onOrganize}>Organize pages</button>

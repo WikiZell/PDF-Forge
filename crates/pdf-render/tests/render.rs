@@ -141,3 +141,14 @@ fn search_finds_hits_across_pages_case_insensitively() {
     assert!(doc.search("", false).unwrap().is_empty());
     assert!(doc.search("zzzz", false).unwrap().is_empty());
 }
+
+#[test]
+fn search_single_page_and_open_from_bytes() {
+    let Some(_) = setup() else { return };
+    let doc = pdf_render::Document::from_bytes(TEXT_PDF.as_bytes().to_vec(), None).unwrap();
+    assert_eq!(doc.page_count(), 3);
+    assert_eq!(doc.search_page(1, "hello", false).unwrap().len(), 1);
+    assert!(doc.search_page(2, "hello", false).unwrap().is_empty());
+    assert!(doc.search_page(9, "hello", false).is_err());
+    assert!(pdf_render::Document::from_bytes(b"junk".to_vec(), None).is_err());
+}

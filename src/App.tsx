@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { PasswordDialog } from "./components/PasswordDialog";
+import { BulkSign } from "./components/BulkSign";
 import { Organizer } from "./components/Organizer";
 import { pickPdfs } from "./lib/organize-api";
 import { useOrganizer } from "./organizerStore";
@@ -23,6 +24,7 @@ export function App() {
   const v = useViewer();
   const org = useOrganizer();
   const sign = useSign();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [libError, setLibError] = useState<string | null>(null);
   const [wrongPw, setWrongPw] = useState(false);
 
@@ -127,6 +129,7 @@ export function App() {
         onOpen={openDialog}
         onPrint={print}
         onOrganize={() => v.doc && org.start([v.doc.path])}
+        onBulk={() => setBulkOpen(true)}
         onMerge={async () => {
           const paths = await pickPdfs().catch(() => []);
           if (paths.length) await org.start(paths);
@@ -143,7 +146,9 @@ export function App() {
         </div>
       )}
 
-      {org.active ? (
+      {bulkOpen ? (
+        <BulkSign onClose={() => setBulkOpen(false)} />
+      ) : org.active ? (
         <Organizer onClose={() => org.close()} />
       ) : v.doc ? (
         <div className="flex min-h-0 flex-1">
