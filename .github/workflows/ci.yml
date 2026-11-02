@@ -97,3 +97,78 @@ jobs:
             target/release/bundle/msi/*.msi
             target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  windows-smoke:
+    name: Windows smoke (install, launch on WebView2, Chrome render)
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          path: installers
+      - name: Generate sample PDFs (merged, signed annotate/flatten)
+        shell: pwsh
+        run: |
+          $env:SAMPLES_DIR = "$PWD\samples"
+          cargo test -p pdf-core --test sample_outputs --locked
+          Get-ChildItem samples
+      - name: Silent per-user install (no admin)
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse installers | Select-Object FullName, Length
+          $exe = Get-ChildItem -Recurse installers -Filter *-setup.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList "/S" -PassThru -Wait
+          "installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+          $app = Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter pdf-forge.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app) { Write-Error "installed pdf-forge.exe not found under LOCALAPPDATA"; exit 1 }
+          "installed at $($app.FullName)"
+          "APP_EXE=$($app.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Get-ChildItem (Split-Path $app.FullName) | Select-Object Name, Length
+          if (-not (Test-Path (Join-Path (Split-Path $app.FullName) "resources\pdfium\pdfium.dll")) -and -not (Test-Path (Join-Path (Split-Path $app.FullName) "pdfium.dll"))) { Write-Warning "pdfium.dll not found next to the exe (checking recursively)"; Get-ChildItem (Split-Path $app.FullName) -Recurse -Filter pdfium.dll }
+      - name: Launch installed app on a PDF under WebView2 and screenshot
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force shots | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          function Shot($name) {
+            $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+            $bmp.Save("$PWD\shots\$name.png"); $g.Dispose(); $bmp.Dispose()
+          }
+          foreach ($f in "merged", "signed-annot", "signed-flat") {
+            $proc = Start-Process -FilePath $env:APP_EXE -ArgumentList "`"$PWD\samples\$f.pdf`"" -PassThru
+            Start-Sleep -Seconds 14
+            $proc.Refresh()
+            "$f : exited=$($proc.HasExited) title='$($proc.MainWindowTitle)'"
+            Shot $f
+            if ($proc.HasExited) { Write-Error "app exited early for $f (exit code $($proc.ExitCode))"; exit 1 }
+            Stop-Process -Id $proc.Id -Force
+            Start-Sleep -Seconds 2
+          }
+      - name: Render the same PDFs in Chrome (independent viewer)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $chrome = (Get-Command chrome -ErrorAction SilentlyContinue).Source
+          if (-not $chrome) { $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe" }
+          foreach ($f in "merged", "signed-annot", "signed-flat") {
+            $url = "file:///" + ("$PWD\samples\$f.pdf" -replace '\\', '/')
+            & $chrome --headless=new --disable-gpu --hide-scrollbars --window-size=900,1100 --virtual-time-budget=8000 "--screenshot=$PWD\shots\chrome-$f.png" $url
+            Start-Sleep -Seconds 3
+          }
+          Get-ChildItem shots | Select-Object Name, Length
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-smoke-screenshots
+          path: |
+            shots/*.png
+            samples/*.pdf
+          if-no-files-found: warn
