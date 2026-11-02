@@ -4,6 +4,7 @@ import { BulkSign } from "./components/BulkSign";
 import { Organizer } from "./components/Organizer";
 import { pickPdfs } from "./lib/organize-api";
 import { useOrganizer } from "./organizerStore";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SignPanel } from "./components/SignPanel";
 import { useSign } from "./signStore";
@@ -26,6 +27,9 @@ export function App() {
   const org = useOrganizer();
   const sign = useSign();
   const [bulkOpen, setBulkOpen] = useState(false);
+  // On narrow windows (small screens or 150-200 % display scaling) two side panels would squeeze the page
+  // to a sliver, so the thumbnail sidebar steps aside while the Fill & Sign panel is open.
+  const narrow = useMediaQuery("(max-width: 900px)");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recentKey, setRecentKey] = useState(0);
   const [libError, setLibError] = useState<string | null>(null);
@@ -156,7 +160,7 @@ export function App() {
         <Organizer onClose={() => org.close()} />
       ) : v.doc ? (
         <div className="flex min-h-0 flex-1">
-          <Sidebar />
+          {!(narrow && sign.active) && <Sidebar />}
           <Viewer />
           {sign.active && <SignPanel />}
         </div>

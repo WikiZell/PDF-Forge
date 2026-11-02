@@ -191,6 +191,9 @@ test("layout holds at 100/125/150/200 % display scaling (no clipping, no horizon
       w: window.innerWidth,
       dpr: window.devicePixelRatio,
     }));
+    // the page area must stay usable at every scale, even with the Fill & Sign panel open
+    const viewerW = await page.evaluate(() => document.querySelector('[aria-label="Document viewer"]')?.getBoundingClientRect().width ?? 0);
+    expect(viewerW, `page area too narrow at ${scale * 100}%`).toBeGreaterThanOrEqual(260);
     expect(m.overflowX, `horizontal overflow at ${scale * 100}%`).toBeLessThanOrEqual(1);
     expect(m.toolbarRight, `toolbar clipped at ${scale * 100}%`).toBeLessThanOrEqual(m.w + 1);
     const img = page.locator('[data-page="0"] img').first();

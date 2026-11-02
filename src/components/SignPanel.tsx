@@ -77,7 +77,7 @@ export function SignPanel() {
 
   const b = "rounded border px-2 py-1 text-sm disabled:opacity-40";
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-auto border-l p-3 text-sm" aria-label="Fill and sign">
+    <aside className="flex w-72 shrink-0 flex-col overflow-auto border-l p-3 text-sm max-[900px]:w-60" aria-label="Fill and sign">
       <h2 className="mb-2 text-base font-semibold">Fill &amp; Sign</h2>
 
       <section aria-labelledby="sigs-h">
