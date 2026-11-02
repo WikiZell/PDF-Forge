@@ -4,17 +4,21 @@ Legend: **verified** = covered by an automated test that ran; **observed** = exe
 running app under a virtual display on Linux (WebKitGTK); **not verified** = not run anywhere yet.
 
 ## Windows status (honest summary)
-Done here: the whole app cross-compiles to a Windows x64 release `pdf-forge.exe` (PE32+ GUI, CSP
-embedded) with `x86_64-pc-windows-gnu`, and the entire `pdf-core` + `pdf-render` test suite
-(104 tests: signing geometry, bulk, merge/organise, encryption, fuzz regressions, perf) was run as
-**Windows executables under Wine against the real Windows `pdfium.dll`** — all pass.
-Cross-testing found one real Windows-only bug (bulk output publishing used create-then-rename,
-which fails with "Access denied" on Windows semantics); it now publishes with a temp file + hard link
-(`write_new_atomic`), covered by tests.
-**Not done:** running the GUI on WebView2, and producing the MSI/NSIS installers — NSIS bundling
-stopped because this sandbox's proxy blocks `go.microsoft.com` (WebView2 bootstrapper download), and
-WiX needs Windows. The `windows-latest` CI job does both; its first run is still the acceptance
-test for the installers. Also never opened in Acrobat Reader / Chrome's viewer.
+**CI on GitHub's runners (run 41489197936, all green):** on `windows-latest` the `pdf-core` and
+`pdf-render` tests pass against the real Windows `pdfium.dll`, and `tauri build` produced the
+unsigned **MSI and NSIS installers** (artifact `windows-installers`, 18.8 MB). The Linux job (typecheck,
+unit tests, 18 Playwright flows, fmt, licence gate, Rust tests with PDFium, 1,000-page perf, clippy
+`-D warnings`, Tauri crate tests) and a 2-minute libFuzzer pass also passed.
+Earlier, locally: the app was cross-compiled to a Windows `pdf-forge.exe` and the 104 core tests were
+run as Windows executables under Wine; that cross-testing found a Windows-only bug in bulk output
+publishing (fixed with temp file + hard link, `write_new_atomic`).
+CI also caught that the workflow YAML itself was invalid (unquoted colon in a job name), which meant
+CI had never run; fixed.
+
+**Still not done (needs a person at a Windows desktop):** installing and *launching* the installers
+and the GUI on WebView2; opening signed/merged output in Acrobat Reader and Chrome; high-DPI
+(100–200 %); a real screen-reader pass; seeing bulk progress in a real window. These are the
+checklist in docs/MANUAL-QA.md. The installers have never been executed.
 
 ## Fuzzing
 `cargo +nightly fuzz run load_build` (load → edit → rebuild → sign annotate/flatten) found a real
