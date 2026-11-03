@@ -139,6 +139,7 @@ export function App() {
         onPrint={print}
         onOrganize={() => v.doc && org.start([v.doc.path])}
         onBulk={() => setBulkOpen(true)}
+        inBulk={bulkOpen}
         onSettings={() => setSettingsOpen(true)}
         onMerge={async () => {
           const paths = await pickPdfs().catch(() => []);

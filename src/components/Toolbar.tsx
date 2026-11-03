@@ -12,6 +12,8 @@ interface Props {
   onMerge: () => void;
   onBulk: () => void;
   onSettings: () => void;
+  /** Bulk sign is open: it is independent of the open document, so hide document controls. */
+  inBulk?: boolean;
 }
 
 const LAYOUTS: { id: Layout; label: string }[] = [
@@ -20,11 +22,11 @@ const LAYOUTS: { id: Layout; label: string }[] = [
   { id: "two-page", label: "Two pages" },
 ];
 
-export function Toolbar({ onOpen, onPrint, onOrganize, onMerge, onBulk, onSettings }: Props) {
+export function Toolbar({ onOpen, onPrint, onOrganize, onMerge, onBulk, onSettings, inBulk }: Props) {
   const v = useViewer();
   const orgActive = useOrganizer((s) => s.active);
   const signing = useSign((s) => s.active);
-  const doc = orgActive ? null : v.doc;
+  const doc = orgActive || inBulk ? null : v.doc;
   const percent = v.zoom.kind === "percent" ? v.zoom.value : Math.round(v.effectiveScale * 100);
   // Labels collapse to icon-only on narrower windows; they stay in the accessibility tree (sr-only).
   const lbl = "max-xl:sr-only";

@@ -22,5 +22,18 @@ for (const scheme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Organize pages" }).click();
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${OUT}/${scheme}-4-organize.png` });
+    await page.getByRole("button", { name: "← Back to viewer" }).click();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/${scheme}-5-settings.png` });
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Fill & Sign" }).click();
+    await page.getByRole("button", { name: "New…" }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/${scheme}-6-signature.png` });
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Bulk sign…" }).click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/${scheme}-7-bulk.png` });
   });
 }
