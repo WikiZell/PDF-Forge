@@ -140,4 +140,21 @@ test.describe("bulk sign", () => {
     expect(run.args.today.year).toBeGreaterThan(2000);
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   });
+
+  // Regression: found on a real Windows run (UI showed "0 of 5 processed - finished"). Events are not ordered
+  // with the invoke() result, so a fast job can finish before the UI even knows the job id.
+  test("a job that finishes before the run call returns still shows the full result once", async ({ page }) => {
+    await installMock(page, { library: true, fastBulk: true });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Bulk sign…" }).click();
+    await page.getByRole("button", { name: "Add folder…" }).click();
+    await page.getByRole("button", { name: "Choose output folder…" }).click();
+    await page.getByRole("button", { name: /Run on 2 file/ }).click();
+    await expect(page.getByText("2 of 2 processed — finished")).toBeVisible();
+    await expect(page.getByText("1 signed, 1 skipped, 0 failed")).toBeVisible();
+    await expect(page.getByText("signing-report.csv")).toBeVisible();
+    // the late progress event must not append duplicate rows
+    await expect(page.getByText("signed", { exact: true })).toHaveCount(1);
+    await expect(page.getByText("skipped", { exact: true })).toHaveCount(1);
+  });
 });

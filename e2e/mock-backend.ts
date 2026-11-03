@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
  * (open/render/organize/sign/bulk commands) with in-memory state to exercise the UI flows.
  * Every call is recorded on `window.__calls` so tests can assert what the UI asked the backend to do.
  */
-export async function installMock(page: Page, opts: { password?: string; library?: boolean } = {}) {
+export async function installMock(page: Page, opts: { password?: string; library?: boolean; fastBulk?: boolean } = {}) {
   await page.addInitScript((o) => {
     const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
     const calls: { cmd: string; args: any }[] = [];
@@ -21,6 +21,9 @@ export async function installMock(page: Page, opts: { password?: string; library
     });
     const snap = () => { past.push(JSON.parse(JSON.stringify(pages))); future.length = 0; };
     const callbacks: Record<number, Function> = {};
+    const listeners: Record<string, number[]> = {};
+    const emit = (event: string, payload: unknown) => (listeners[event] ?? []).forEach((id) => callbacks[id]?.({ event, id, payload }));
+    (window as any).__emit = emit;
     let cb = 1;
 
     const handle = (cmd: string, a: any): any => {
@@ -70,7 +73,7 @@ export async function installMock(page: Page, opts: { password?: string; library
         case "bulk_preview_image": return png.buffer;
         case "bulk_run": return 7;
         default:
-          if (cmd.startsWith("plugin:event|listen")) return cb++;
+          if (cmd.startsWith("plugin:event|listen")) { (listeners[a.event] ??= []).push(a.handler); return cb++; }
           if (cmd.startsWith("plugin:event|")) return null;
           throw { code: "internal", message: "mock: unhandled " + cmd };
       }
@@ -83,6 +86,14 @@ export async function installMock(page: Page, opts: { password?: string; library
       invoke: async (cmd: string, args: any = {}) => {
         calls.push({ cmd, args: JSON.parse(JSON.stringify(args)) });
         const r = handle(cmd, args);
+        if (cmd === "bulk_run" && o.fastBulk) {
+          // A very fast job: "finished" (and even a late progress event) arrive before invoke() resolves.
+          const items = (args.files as string[]).map((f, i) => i === 0
+            ? { input: f, status: "signed", detail: "1 signature(s)", output: "/mock/out/c1_signed.pdf" }
+            : { input: f, status: "skipped", detail: 'anchor text "Signature:" not found', output: null });
+          emit("bulk-finished", { jobId: 7, items, reportPath: "/mock/out/signing-report.csv", error: null, cancelled: false });
+          emit("bulk-progress", { jobId: 7, done: 1, total: items.length, item: items[0] });
+        }
         // Real IPC serialises results; never hand the app a reference into the mock's own state.
         return r instanceof ArrayBuffer || r === null || r === undefined ? r : JSON.parse(JSON.stringify(r));
       },

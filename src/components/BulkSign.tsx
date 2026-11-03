@@ -28,24 +28,36 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
   const [cancelled, setCancelled] = useState(false);
   const [busy, setBusy] = useState(false);
   const job = useRef<number | null>(null);
+  // Events can arrive before bulkRun() has returned the job id (fast jobs): hold them and replay in order.
+  type Early = { kind: "progress"; e: api.ProgressEvent } | { kind: "finished"; e: api.FinishedEvent };
+  const early = useRef<Early[]>([]);
+  const onProgress = useRef<(e: api.ProgressEvent) => void>(() => {});
+  const onFinished = useRef<(e: api.FinishedEvent) => void>(() => {});
+  const finished = useRef(false); // events are not ordered: ignore progress that arrives after "finished"
+
+  onProgress.current = (e) => {
+    if (e.jobId !== job.current || finished.current) return;
+    setProgress({ done: e.done, total: e.total });
+    setItems((l) => [...l, e.item]);
+  };
+  onFinished.current = (e) => {
+    if (e.jobId !== job.current) return;
+    finished.current = true;
+    // "finished" carries the full item list, so the count never depends on progress events having arrived
+    setProgress((p) => ({ done: e.items.length, total: Math.max(p.total, e.items.length) }));
+    setItems(e.items);
+    setReportPath(e.reportPath);
+    setCancelled(e.cancelled);
+    if (e.error) setError(e.error);
+    setPhase("done");
+  };
 
   useEffect(() => {
     void useSign.getState().loadLibrary();
     api.bulkDefaultWorkers().then((n) => { setWorkers(n); setMaxWorkers(Math.max(n, navigator.hardwareConcurrency || n)); }).catch(() => {});
     const subs = [
-      api.onBulkProgress((e) => {
-        if (e.jobId !== job.current) return;
-        setProgress({ done: e.done, total: e.total });
-        setItems((l) => [...l, e.item]);
-      }),
-      api.onBulkFinished((e) => {
-        if (e.jobId !== job.current) return;
-        setItems(e.items.length ? e.items : []);
-        setReportPath(e.reportPath);
-        setCancelled(e.cancelled);
-        if (e.error) setError(e.error);
-        setPhase("done");
-      }),
+      api.onBulkProgress((e) => (job.current === null ? early.current.push({ kind: "progress", e }) : onProgress.current(e))),
+      api.onBulkFinished((e) => (job.current === null ? early.current.push({ kind: "finished", e }) : onFinished.current(e))),
     ];
     return () => { subs.forEach((s) => s.then((f) => f())); };
   }, []);
@@ -79,9 +91,16 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
     if ("error" in ruleResult) throw new Error(ruleResult.error);
     if (files.length === 0) throw new Error("Add some PDF files first.");
     if (!outDir) throw new Error("Choose an output folder.");
+    finished.current = false;
+    job.current = null;
+    early.current = [];
     setItems([]); setProgress({ done: 0, total: files.length }); setReportPath(null); setCancelled(false);
-    job.current = await api.bulkRun(ruleResult.rule, files, workers);
+    const id = await api.bulkRun(ruleResult.rule, files, workers);
+    job.current = id;
     setPhase("running");
+    const held = early.current.filter((x) => x.e.jobId === id);
+    early.current = [];
+    for (const x of held) { if (x.kind === "progress") onProgress.current(x.e); else onFinished.current(x.e); }
   });
 
   const counts = summarize(preview ?? []);
