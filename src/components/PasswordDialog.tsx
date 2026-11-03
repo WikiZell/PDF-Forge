@@ -14,20 +14,20 @@ export function PasswordDialog({ fileName, wrong, onSubmit, onCancel }: Props) {
   const dlg = useModal<HTMLFormElement>(onCancel, "#pw");
 
   return (
-    <div className="fixed inset-0 z-10 grid place-items-center bg-black/40" role="presentation">
+    <div className="fixed inset-0 z-10 grid place-items-center scrim" role="presentation">
       <form
         ref={dlg}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pw-title"
-        className="w-96 rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800"
+        className="w-96 dialog-card"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit(pw);
         }}
       >
         <h2 id="pw-title" className="mb-1 text-lg font-semibold">Password required</h2>
-        <p className="mb-3 break-all text-sm text-neutral-600 dark:text-neutral-300">{fileName}</p>
+        <p className="mb-3 break-all text-sm text-[var(--muted)]">{fileName}</p>
         <label className="block text-sm" htmlFor="pw">Password</label>
         <input
           id="pw"
@@ -35,18 +35,18 @@ export function PasswordDialog({ fileName, wrong, onSubmit, onCancel }: Props) {
           autoComplete="off"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          className="mt-1 w-full rounded border px-2 py-1 dark:bg-neutral-900"
+          className="input mt-1 w-full"
           aria-invalid={wrong}
           aria-describedby={wrong ? "pw-err" : undefined}
         />
         {wrong && (
-          <p id="pw-err" role="alert" className="mt-1 text-sm text-red-600">
+          <p id="pw-err" role="alert" className="mt-1 text-sm text-[var(--danger)]">
             The password is incorrect.
           </p>
         )}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded border px-3 py-1" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="rounded bg-blue-600 px-3 py-1 text-white">Open</button>
+          <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+          <button type="submit" className="btn btn-primary">Open</button>
         </div>
       </form>
     </div>

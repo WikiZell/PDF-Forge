@@ -42,29 +42,29 @@ export function SignatureDialog({ onClose }: { onClose: () => void }) {
       <div
         ref={dlg}
         role="dialog" aria-modal="true" aria-labelledby="sigdlg-h"
-        className="max-h-[90vh] w-[40rem] max-w-[95vw] overflow-auto rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800"
+        className="max-h-[90vh] w-[40rem] max-w-[95vw] overflow-auto dialog-card"
       >
         <h2 id="sigdlg-h" className="mb-3 text-lg font-semibold">New signature</h2>
         <div role="tablist" aria-label="Signature source" className="mb-3 flex gap-1 border-b">
           {(["draw", "type", "import"] as Tab[]).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-              className={`px-3 py-1.5 text-sm ${tab === t ? "border-b-2 border-blue-600 font-semibold" : ""}`}>
+              className={`tab`}>
               {t === "draw" ? "Draw" : t === "type" ? "Type" : "Import image"}
             </button>
           ))}
         </div>
         <label className="mb-3 block text-sm">
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="ml-2 w-64 rounded border px-2 py-1 dark:bg-neutral-900" />
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="ml-2 w-64 btn btn-sm dark:bg-neutral-900" />
         </label>
 
         {tab === "draw" && <DrawTab name={name} saving={saving} onSave={(d) => run(() => api.sigCreateDrawn({ name, ...d }))} />}
         {tab === "type" && <TypeTab name={name} saving={saving} onSave={(png, text, font) => run(() => api.sigCreateImage(png, { name, kind: "typed", text, font }))} />}
         {tab === "import" && <ImportTab name={name} saving={saving} onSave={(png) => run(() => api.sigCreateImage(png, { name, kind: "imported" }))} onError={setError} />}
 
-        {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-[var(--danger)]">{error}</p>}
         <div className="mt-4 flex justify-end">
-          <button className="rounded border px-3 py-1" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>
@@ -135,12 +135,12 @@ function DrawTab({ name, saving, onSave }: { name: string; saving: boolean; onSa
         onPointerCancel={() => { drawing.current = false; setCount(strokes.current.length); }}
       />
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <button className="rounded border px-2 py-1" disabled={count === 0} onClick={() => { strokes.current.pop(); setCount(strokes.current.length); redraw(); }}>Undo stroke</button>
-        <button className="rounded border px-2 py-1" disabled={count === 0} onClick={() => { strokes.current = []; setCount(0); redraw(); }}>Clear</button>
-        <label>Ink <select value={color} onChange={(e) => setColor(Number(e.target.value))} className="rounded border px-1 dark:bg-neutral-900">{COLORS.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}</select></label>
+        <button className="btn btn-sm" disabled={count === 0} onClick={() => { strokes.current.pop(); setCount(strokes.current.length); redraw(); }}>Undo stroke</button>
+        <button className="btn btn-sm" disabled={count === 0} onClick={() => { strokes.current = []; setCount(0); redraw(); }}>Clear</button>
+        <label>Ink <select value={color} onChange={(e) => setColor(Number(e.target.value))} className="input">{COLORS.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}</select></label>
         <label>Thickness <input type="range" min={1} max={8} step={0.5} value={width} onChange={(e) => setWidth(Number(e.target.value))} /></label>
         <span className="flex-1" />
-        <button className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-40" disabled={count === 0 || saving || !name.trim()} onClick={save}>Save signature</button>
+        <button className="btn btn-primary" disabled={count === 0 || saving || !name.trim()} onClick={save}>Save signature</button>
       </div>
     </div>
   );
@@ -187,21 +187,21 @@ function TypeTab({ name, saving, onSave }: { name: string; saving: boolean; onSa
   return (
     <div>
       <label className="block text-sm">Type your signature
-        <input value={text} onChange={(e) => setText(e.target.value.slice(0, 60))} className="mt-1 w-full rounded border px-2 py-1 dark:bg-neutral-900" />
+        <input value={text} onChange={(e) => setText(e.target.value.slice(0, 60))} className="input mt-1 w-full" />
       </label>
       <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Handwriting font">
         {api.SIGNATURE_FONTS.map((f) => (
           <button key={f.id} role="radio" aria-checked={font === f.id} onClick={() => setFont(f.id)}
-            className={`rounded border px-3 py-1 text-2xl ${font === f.id ? "ring-2 ring-blue-600" : ""}`} style={{ fontFamily: f.css }}>
+            className={`btn text-2xl ${font === f.id ? "ring-2 ring-blue-600" : ""}`} style={{ fontFamily: f.css }}>
             {text || "Signature"}
           </button>
         ))}
       </div>
       <canvas ref={canvas} width={900} height={220} className="mt-3 w-full rounded border bg-white" aria-label="Signature preview" />
       <div className="mt-2 flex items-center gap-2 text-sm">
-        <label>Ink <select value={color} onChange={(e) => setColor(Number(e.target.value))} className="rounded border px-1 dark:bg-neutral-900">{COLORS.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}</select></label>
+        <label>Ink <select value={color} onChange={(e) => setColor(Number(e.target.value))} className="input">{COLORS.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}</select></label>
         <span className="flex-1" />
-        <button className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-40" disabled={!text.trim() || saving || !name.trim()} onClick={save}>Save signature</button>
+        <button className="btn btn-primary" disabled={!text.trim() || saving || !name.trim()} onClick={save}>Save signature</button>
       </div>
     </div>
   );
@@ -249,12 +249,12 @@ function ImportTab({ name, saving, onSave, onError }: { name: string; saving: bo
             <input type="range" min={20} max={254} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} aria-valuetext={`${threshold} of 255`} />
             <span className="w-8 tabular-nums">{threshold}</span>
           </label>
-          <p className="text-xs text-neutral-500">Lighter pixels than the threshold become transparent. Lower it to remove more of the paper.</p>
+          <p className="text-xs text-[var(--muted)]">Lighter pixels than the threshold become transparent. Lower it to remove more of the paper.</p>
           <div className="mt-2 grid h-40 place-items-center rounded border" style={{ backgroundImage: "repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%)", backgroundSize: "16px 16px" }}>
             {preview ? <img src={preview.url} alt="Processed signature preview" className="max-h-36 max-w-full" /> : <span className="text-sm">No preview</span>}
           </div>
           <div className="mt-2 flex justify-end">
-            <button className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-40" disabled={!preview || saving || !name.trim()} onClick={() => preview && onSave(preview.bytes)}>Save signature</button>
+            <button className="btn btn-primary" disabled={!preview || saving || !name.trim()} onClick={() => preview && onSave(preview.bytes)}>Save signature</button>
           </div>
         </>
       )}

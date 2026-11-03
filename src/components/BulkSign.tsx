@@ -6,8 +6,8 @@ import { pickPdfs } from "../lib/organize-api";
 import { useSign } from "../signStore";
 
 const base = (p: string) => p.split(/[\\/]/).pop() ?? p;
-const input = "rounded border px-1.5 py-1 dark:bg-neutral-900";
-const btn = "rounded border px-2 py-1 text-sm disabled:opacity-40";
+const input = "input";
+const btn = "btn btn-sm text-sm disabled:opacity-40";
 
 type Phase = "edit" | "running" | "done";
 
@@ -96,13 +96,13 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <button className={btn} onClick={onClose} disabled={phase === "running"}>← Back</button>
         <h2 className="text-base font-semibold">Bulk sign</h2>
-        <span className="text-xs text-neutral-500">Originals are never modified. Outputs are new files named <code>name_signed.pdf</code>.</span>
+        <span className="text-xs text-[var(--muted)]">Originals are never modified. Outputs are new files named <code>name_signed.pdf</code>.</span>
       </div>
       {error && <div role="alert" className="border-b border-amber-300 bg-amber-100 px-3 py-2 text-sm text-amber-900">{error}</div>}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3 lg:grid-cols-3">
         {/* 1 files */}
-        <section aria-labelledby="b1" className="flex min-h-0 flex-col rounded border p-3">
+        <section aria-labelledby="b1" className="flex min-h-0 flex-col card">
           <h3 id="b1" className="mb-2 font-semibold">1. Files</h3>
           <div className="mb-2 flex flex-wrap gap-2">
             <button className={btn} disabled={phase === "running"} onClick={() => guard(async () => addFiles(await pickPdfs()))}>Add files…</button>
@@ -112,15 +112,15 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
           <p className="mb-1 text-sm" aria-live="polite">{files.length} file(s) selected</p>
           <ul className="min-h-24 flex-1 overflow-auto rounded border text-sm">
             {files.map((f) => (
-              <li key={f} className="flex items-center gap-1 px-2 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800" title={f}>
+              <li key={f} className="flex items-center gap-1 px-2 py-0.5 hover:bg-[var(--surface-2)]" title={f}>
                 <span className="min-w-0 flex-1 truncate">{base(f)}</span>
-                <button aria-label={`Remove ${base(f)}`} className="px-1 text-neutral-500" disabled={phase === "running"} onClick={() => { setFiles((l) => l.filter((x) => x !== f)); setPreview(null); }}>✕</button>
+                <button aria-label={`Remove ${base(f)}`} className="px-1 text-[var(--muted)]" disabled={phase === "running"} onClick={() => { setFiles((l) => l.filter((x) => x !== f)); setPreview(null); }}>✕</button>
               </li>
             ))}
           </ul>
           <div className="mt-3 space-y-2">
             <button className={btn} disabled={phase === "running"} onClick={() => guard(async () => setOutDir(await api.bulkPickOutputDir()))}>Choose output folder…</button>
-            <p className="break-all text-xs text-neutral-600 dark:text-neutral-300">{outDir ?? "No output folder chosen."}</p>
+            <p className="break-all text-xs text-[var(--muted)]">{outDir ?? "No output folder chosen."}</p>
             {field("Parallel workers", <input type="number" className={`${input} w-16`} min={1} max={maxWorkers} value={workers} onChange={(e) => setWorkers(Math.max(1, Math.min(64, Number(e.target.value) || 1)))} />)}
           </div>
         </section>
@@ -142,7 +142,7 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
               {form.pages === "number" && num("pageNumber", 1, undefined, "w-16")}
             </span>)}
 
-          <fieldset className="space-y-2 rounded border p-2">
+          <fieldset className="space-y-2 card">
             <legend className="px-1 text-sm">Position</legend>
             <div className="flex gap-4 text-sm" role="radiogroup" aria-label="Position type">
               <label><input type="radio" checked={form.position === "anchor"} onChange={() => set("position", "anchor")} /> Anchor text</label>
@@ -151,7 +151,7 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
             {form.position === "fixed" ? (
               <>
                 <div className="flex gap-3">{field("X", num("x"))}{field("Y", num("y"))}</div>
-                <p className="text-xs text-neutral-500">Points from the page's top-left corner (1 pt = 1/72 in). A4 is 595 × 842.</p>
+                <p className="text-xs text-[var(--muted)]">Points from the page's top-left corner (1 pt = 1/72 in). A4 is 595 × 842.</p>
               </>
             ) : (
               <>
@@ -164,7 +164,7 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
             )}
           </fieldset>
 
-          <fieldset className="space-y-2 rounded border p-2">
+          <fieldset className="space-y-2 card">
             <legend className="px-1 text-sm">Date / text stamp</legend>
             {field("Stamp", <select className={input} value={form.stamp} onChange={(e) => set("stamp", e.target.value as RuleForm["stamp"])}><option value="none">None</option><option value="date">Date</option><option value="text">Text</option></select>)}
             {form.stamp === "date" && field("Format", <select className={input} value={form.dateFormat} onChange={(e) => set("dateFormat", e.target.value as RuleForm["dateFormat"])}><option value="iso">2026-11-02</option><option value="dmy">02/11/2026</option><option value="mdy">11/02/2026</option></select>)}
@@ -173,7 +173,7 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
               <>
                 <div className="flex gap-3">{field("Size", num("stampFontSize", 4, 200, "w-16"))}</div>
                 <div className="flex gap-3">{field("Offset X", num("stampOffsetX"))}{field("Offset Y", num("stampOffsetY"))}</div>
-                <p className="text-xs text-neutral-500">Offsets are from the signature's top-left corner.</p>
+                <p className="text-xs text-[var(--muted)]">Offsets are from the signature's top-left corner.</p>
               </>
             )}
           </fieldset>
@@ -186,22 +186,22 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
         </section>
 
         {/* 3 preview + run */}
-        <section aria-labelledby="b3" className="flex min-h-0 flex-col rounded border p-3">
+        <section aria-labelledby="b3" className="flex min-h-0 flex-col card">
           <h3 id="b3" className="mb-2 font-semibold">3. Preview and run</h3>
           <div className="mb-2 flex flex-wrap gap-2">
             <button className={btn} disabled={busy || phase === "running"} onClick={runPreview}>Preview rule</button>
-            <button className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-40" disabled={busy || phase === "running" || files.length === 0 || !outDir || "error" in ruleResult} onClick={start}>Run on {files.length} file(s)</button>
+            <button className="btn btn-primary btn-sm" disabled={busy || phase === "running" || files.length === 0 || !outDir || "error" in ruleResult} onClick={start}>Run on {files.length} file(s)</button>
             {phase === "running" && <button className={btn} onClick={() => job.current !== null && api.bulkCancel(job.current)}>Cancel</button>}
           </div>
 
           {phase === "edit" && preview && (
             <div className="min-h-0 flex-1 overflow-auto text-sm">
               <p aria-live="polite">Would sign {counts.signed}, skip {counts.skipped}, fail {counts.failed}.</p>
-              {previewImg && <img src={previewImg} alt="Preview of the rule applied to the first signable file" className="my-2 max-h-72 border bg-white" />}
+              {previewImg && <img src={previewImg} alt="Preview of the rule applied to the first signable file" className="my-2 max-h-72 rounded-lg border bg-white" />}
               {missing.length > 0 && (
                 <>
                   <h4 className="mt-2 font-semibold">Files that would not be signed</h4>
-                  <ul>{missing.map((m) => <li key={m.input} className="py-0.5"><span className={m.status === "failed" ? "text-red-700" : "text-amber-700"}>{m.status}</span> {base(m.input)}: {m.detail}</li>)}</ul>
+                  <ul>{missing.map((m) => <li key={m.input} className="py-0.5"><span className={m.status === "failed" ? "text-[var(--danger)]" : "text-amber-600"}>{m.status}</span> {base(m.input)}: {m.detail}</li>)}</ul>
                 </>
               )}
             </div>
@@ -216,7 +216,7 @@ export function BulkSign({ onClose }: { onClose: () => void }) {
               <ul className="mt-1">
                 {items.map((m, i) => (
                   <li key={i} className="py-0.5">
-                    <span className={m.status === "signed" ? "text-green-700" : m.status === "failed" ? "text-red-700" : "text-amber-700"}>{m.status}</span> {base(m.input)} <span className="text-neutral-500">{m.detail}</span>
+                    <span className={m.status === "signed" ? "text-green-700" : m.status === "failed" ? "text-[var(--danger)]" : "text-amber-600"}>{m.status}</span> {base(m.input)} <span className="text-[var(--muted)]">{m.detail}</span>
                   </li>
                 ))}
               </ul>

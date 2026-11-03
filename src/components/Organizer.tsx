@@ -51,11 +51,11 @@ function Cell({ index, dragging }: { index: number; dragging: boolean }) {
       aria-label={`Page ${index + 1}${p.kind === "blank" ? " (blank)" : ""}${p.rotate ? `, rotated ${p.rotate} degrees` : ""}`}
       tabIndex={-1}
       data-index={index}
-      className={`flex select-none flex-col items-center rounded p-2 ${selected ? "bg-blue-100 ring-2 ring-blue-600 dark:bg-blue-950" : ""} ${dragging && selected ? "opacity-40" : ""}`}
+      className={`flex select-none flex-col items-center rounded-xl p-2 transition-colors ${selected ? "bg-[var(--accent-soft)] ring-2 ring-[var(--accent)]" : "hover:bg-[var(--surface-3)]"} ${dragging && selected ? "opacity-40" : ""}`}
       style={{ width: THUMB_W + 24 }}
     >
       <div className="relative flex items-center justify-center" style={{ width: THUMB_W, height: THUMB_W }}>
-        <div className="relative overflow-hidden bg-white shadow" style={{ width: boxW, height: boxH }}>
+        <div className="relative overflow-hidden page-sheet" style={{ width: boxW, height: boxH }}>
           {p.kind === "blank" ? (
             <span className="absolute inset-0 grid place-items-center text-xs text-neutral-400">Blank</span>
           ) : (
@@ -225,45 +225,49 @@ export function Organizer({ onClose }: { onClose: () => void }) {
   };
 
   if (!st) return null;
-  const b = "rounded border px-2 py-1 text-sm disabled:opacity-40";
+  const b = "btn btn-sm";
   const hasSel = sel.length > 0;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2" role="toolbar" aria-label="Page organizer tools">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5" style={{ background: "var(--surface)" }} role="toolbar" aria-label="Page organizer tools">
         <button className={b} onClick={onClose}>← Back to viewer</button>
-        <span className="mx-1 h-5 border-l" aria-hidden />
-        <button className={b} disabled={!st.canUndo} onClick={() => o.edit({ op: "undo" })} aria-keyshortcuts="Control+Z">Undo</button>
-        <button className={b} disabled={!st.canRedo} onClick={() => o.edit({ op: "redo" })} aria-keyshortcuts="Control+Y">Redo</button>
-        <span className="mx-1 h-5 border-l" aria-hidden />
-        <button className={b} disabled={!hasSel} onClick={() => rotate(-90)}>Rotate ⟲</button>
-        <button className={b} disabled={!hasSel} onClick={() => rotate(90)}>Rotate ⟳</button>
-        <button className={b} disabled={!hasSel} onClick={dup}>Duplicate</button>
-        <button className={b} disabled={!hasSel || sel.length >= count} onClick={del} aria-keyshortcuts="Delete">Delete</button>
-        <button className={b} disabled={!hasSel} onClick={() => nudge(-1)} aria-keyshortcuts="Alt+ArrowLeft">Move earlier</button>
-        <button className={b} disabled={!hasSel} onClick={() => nudge(1)} aria-keyshortcuts="Alt+ArrowRight">Move later</button>
-        <span className="mx-1 h-5 border-l" aria-hidden />
-        <label className="text-sm">
-          <span className="sr-only">Blank page size</span>
-          <select className="rounded border px-1 py-1 dark:bg-neutral-800" value={blankSize} onChange={(e) => setBlankSize(e.target.value as typeof blankSize)}>
-            <option value="same">Blank: same size</option>
-            <option value="a4">Blank: A4</option>
-            <option value="letter">Blank: Letter</option>
-          </select>
-        </label>
-        <button className={b} onClick={() => addBlank("before")}>Add blank before</button>
-        <button className={b} onClick={() => addBlank("after")}>Add blank after</button>
-        <span className="mx-1 h-5 border-l" aria-hidden />
-        <button className={b} onClick={() => insertFiles(false)}>Insert PDF here…</button>
-        <button className={b} onClick={() => insertFiles(true)}>Add PDFs (merge)…</button>
-        <button className={b} disabled={!hasSel} onClick={extract}>Extract selected…</button>
-        <button className={b} onClick={() => setSplitOpen(true)}>Split…</button>
-        <span className="mx-1 h-5 border-l" aria-hidden />
-        <button className={b} onClick={() => o.refreshPreview()} disabled={o.busy}>Preview output</button>
-        <button className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-40" disabled={o.busy} onClick={saveAs}>Save a copy…</button>
-        <button className={b} disabled={!st.canSaveOver || o.busy} onClick={saveOver}>Save (overwrite, keeps .bak)</button>
+        <span className="divider" aria-hidden />
+        <div className="group" role="group" aria-label="History">
+          <button className={b} disabled={!st.canUndo} onClick={() => o.edit({ op: "undo" })} aria-keyshortcuts="Control+Z">Undo</button>
+          <button className={b} disabled={!st.canRedo} onClick={() => o.edit({ op: "redo" })} aria-keyshortcuts="Control+Y">Redo</button>
+        </div>
+        <div className="group" role="group" aria-label="Selected pages">
+          <button className={b} disabled={!hasSel} onClick={() => rotate(-90)}>Rotate ⟲</button>
+          <button className={b} disabled={!hasSel} onClick={() => rotate(90)}>Rotate ⟳</button>
+          <button className={b} disabled={!hasSel} onClick={dup}>Duplicate</button>
+          <button className={b} disabled={!hasSel || sel.length >= count} onClick={del} aria-keyshortcuts="Delete">Delete</button>
+          <button className={b} disabled={!hasSel} onClick={() => nudge(-1)} aria-keyshortcuts="Alt+ArrowLeft">Move earlier</button>
+          <button className={b} disabled={!hasSel} onClick={() => nudge(1)} aria-keyshortcuts="Alt+ArrowRight">Move later</button>
+        </div>
+        <div className="group" role="group" aria-label="Add pages">
+          <label className="text-sm">
+            <span className="sr-only">Blank page size</span>
+            <select className="input" value={blankSize} onChange={(e) => setBlankSize(e.target.value as typeof blankSize)}>
+              <option value="same">Blank: same size</option>
+              <option value="a4">Blank: A4</option>
+              <option value="letter">Blank: Letter</option>
+            </select>
+          </label>
+          <button className={b} onClick={() => addBlank("before")}>Add blank before</button>
+          <button className={b} onClick={() => addBlank("after")}>Add blank after</button>
+          <button className={b} onClick={() => insertFiles(false)}>Insert PDF here…</button>
+          <button className={b} onClick={() => insertFiles(true)}>Add PDFs (merge)…</button>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button className={b} disabled={!hasSel} onClick={extract}>Extract selected…</button>
+          <button className={b} onClick={() => setSplitOpen(true)}>Split…</button>
+          <button className={b} onClick={() => o.refreshPreview()} disabled={o.busy}>Preview output</button>
+          <button className={b} disabled={!st.canSaveOver || o.busy} onClick={saveOver}>Save (overwrite, keeps .bak)</button>
+          <button className="btn btn-primary btn-sm" disabled={o.busy} onClick={saveAs}>Save a copy…</button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800" aria-live="polite">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-[var(--surface-2)] px-4 py-1.5 text-xs" aria-live="polite">
         <span>{count} pages · {sel.length} selected</span>
         <span>Files: {st.sources.map((s) => `${s.name} (${s.pageCount})`).join(", ") || "none"}</span>
         {o.preview && (
@@ -306,18 +310,18 @@ export function Organizer({ onClose }: { onClose: () => void }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className="relative flex flex-1 flex-wrap content-start gap-2 overflow-auto bg-neutral-200 p-4 outline-none focus-visible:ring-2 dark:bg-neutral-700"
+        className="relative flex flex-1 flex-wrap content-start gap-2 overflow-auto bg-[var(--canvas)] p-6 outline-none focus-visible:ring-2"
         style={{ touchAction: "none" }}
       >
         {st.pages.map((_, i) => (
           <div key={i} className="relative">
-            {drag && drag.gap === i && <div className="absolute -left-1.5 top-0 z-10 h-full w-1 rounded bg-blue-600" aria-hidden />}
+            {drag && drag.gap === i && <div className="absolute -left-1.5 top-0 z-10 h-full w-1 rounded bg-[var(--accent)]" aria-hidden />}
             <Cell index={i} dragging={!!drag} />
-            {drag && drag.gap === count && i === count - 1 && <div className="absolute -right-1.5 top-0 z-10 h-full w-1 rounded bg-blue-600" aria-hidden />}
+            {drag && drag.gap === count && i === count - 1 && <div className="absolute -right-1.5 top-0 z-10 h-full w-1 rounded bg-[var(--accent)]" aria-hidden />}
           </div>
         ))}
         {drag && (
-          <div className="pointer-events-none fixed z-20 rounded bg-blue-600 px-2 py-1 text-xs text-white" style={{ left: drag.x + 12, top: drag.y + 12 }}>
+          <div className="pointer-events-none fixed z-20 rounded bg-[var(--accent)] px-2 py-1 text-xs text-white" style={{ left: drag.x + 12, top: drag.y + 12 }}>
             {sel.length} page{sel.length === 1 ? "" : "s"}
           </div>
         )}
@@ -358,26 +362,26 @@ function SplitDialog({ session, onClose }: { session: number; onClose: () => voi
     }
   };
   return (
-    <div className="fixed inset-0 z-10 grid place-items-center bg-black/40">
+    <div className="fixed inset-0 z-10 grid place-items-center scrim">
       <form
         ref={dlg}
         role="dialog" aria-modal="true" aria-labelledby="split-h"
-        className="w-[28rem] rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800"
+        className="w-[28rem] dialog-card"
         onSubmit={(e) => { e.preventDefault(); void run(); }}
       >
         <h2 id="split-h" className="mb-3 text-lg font-semibold">Split document</h2>
         <fieldset className="space-y-2 text-sm">
           <legend className="sr-only">Split mode</legend>
           <label className="flex items-center gap-2"><input type="radio" checked={mode === "everyN"} onChange={() => setMode("everyN")} />Every
-            <input type="number" min={1} value={n} onChange={(e) => setN(Math.max(1, Number(e.target.value)))} className="w-16 rounded border px-1 dark:bg-neutral-900" aria-label="Pages per file" /> page(s)</label>
+            <input type="number" min={1} value={n} onChange={(e) => setN(Math.max(1, Number(e.target.value)))} className="w-16 input" aria-label="Pages per file" /> page(s)</label>
           <label className="flex items-center gap-2"><input type="radio" checked={mode === "ranges"} onChange={() => setMode("ranges")} />Page ranges
-            <input value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="1-3, 4-6, 7-" className="flex-1 rounded border px-1 dark:bg-neutral-900" aria-label="Page ranges" /></label>
+            <input value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="1-3, 4-6, 7-" className="flex-1 input" aria-label="Page ranges" /></label>
           <label className="flex items-center gap-2"><input type="radio" checked={mode === "bookmarks"} onChange={() => setMode("bookmarks")} />At top-level bookmarks</label>
         </fieldset>
-        <p className="mt-3 text-xs text-neutral-500">You will choose an output folder. Existing files are never overwritten.</p>
+        <p className="mt-3 text-xs text-[var(--muted)]">You will choose an output folder. Existing files are never overwritten.</p>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded border px-3 py-1" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={busy} className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-40">Split…</button>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={busy} className="btn btn-primary">Split…</button>
         </div>
       </form>
     </div>

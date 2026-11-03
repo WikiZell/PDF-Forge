@@ -36,22 +36,22 @@ export function SettingsDialog({ onClose, onCleared }: { onClose: () => void; on
     }
   };
 
-  const field = "w-28 rounded border px-2 py-1 dark:bg-neutral-900";
+  const field = "input w-28";
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-black/40" role="presentation">
-      <div ref={dlg} role="dialog" aria-modal="true" aria-labelledby="set-h" className="max-h-[90vh] w-[34rem] max-w-[95vw] overflow-auto rounded-lg bg-white p-5 shadow-xl dark:bg-neutral-800">
+      <div ref={dlg} role="dialog" aria-modal="true" aria-labelledby="set-h" className="max-h-[90vh] w-[34rem] max-w-[95vw] overflow-auto dialog-card">
         <h2 id="set-h" className="mb-3 text-lg font-semibold">Settings</h2>
 
         <section aria-labelledby="lim-h" className="mb-4">
           <h3 id="lim-h" className="mb-1 font-semibold">Safety limits</h3>
-          <p className="mb-2 text-xs text-neutral-500">Every PDF is treated as untrusted input. Files above these limits are refused.</p>
+          <p className="mb-2 text-xs text-[var(--muted)]">Every PDF is treated as untrusted input. Files above these limits are refused.</p>
           {s && (
             <div className="space-y-2 text-sm">
               <label className="flex items-center justify-between">Maximum file size (MB)
                 <input type="number" className={field} min={1} max={16384} value={s.maxFileSizeMb} onChange={(e) => setS({ ...s, maxFileSizeMb: Number(e.target.value) })} /></label>
               <label className="flex items-center justify-between">Maximum page count
                 <input type="number" className={field} min={1} max={1000000} value={s.maxPages} onChange={(e) => setS({ ...s, maxPages: Number(e.target.value) })} /></label>
-              <button className="rounded bg-blue-600 px-3 py-1 text-white" onClick={save}>Save limits</button>
+              <button className="btn btn-primary" onClick={save}>Save limits</button>
             </div>
           )}
         </section>
@@ -67,11 +67,11 @@ export function SettingsDialog({ onClose, onCleared }: { onClose: () => void; on
 
         <section aria-labelledby="clr-h" className="mb-2">
           <h3 id="clr-h" className="mb-1 font-semibold">Clear all app data</h3>
-          <button className="rounded border border-red-600 px-3 py-1 text-sm text-red-700" onClick={clear}>Clear all app data…</button>
+          <button className="btn btn-danger" onClick={clear}>Clear all app data…</button>
         </section>
 
-        {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2 text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.text}</p>}
-        <div className="mt-4 flex justify-end"><button className="rounded border px-3 py-1" onClick={onClose}>Close</button></div>
+        {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2 text-sm ${msg.ok ? "text-green-700" : "text-[var(--danger)]"}`}>{msg.text}</p>}
+        <div className="mt-4 flex justify-end"><button className="btn" onClick={onClose}>Close</button></div>
       </div>
     </div>
   );

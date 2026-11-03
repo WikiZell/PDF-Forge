@@ -137,17 +137,17 @@ export function SignLayer({ page, width, height, scale }: Props) {
                     <div
                       key={h}
                       aria-hidden
-                      className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-blue-600 bg-white"
+                      className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-[var(--accent)] bg-white"
                       style={{ left, top, cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize" }}
                       onPointerDown={(e) => begin(e, p, { kind: "resize", handle: h })}
                     />
                   );
                 })}
-                <div aria-hidden className="absolute left-1/2 -top-[22px] h-[22px] w-px bg-blue-600" style={{ transform: "translateX(-50%)" }} />
+                <div aria-hidden className="absolute left-1/2 -top-[22px] h-[22px] w-px bg-[var(--accent)]" style={{ transform: "translateX(-50%)" }} />
                 <div
                   aria-hidden
                   title="Rotate"
-                  className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border border-blue-600 bg-white"
+                  className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border border-[var(--accent)] bg-white"
                   style={{ top: -22 * 1 - 6, cursor: "grab" }}
                   onPointerDown={(e) => begin(e, p, { kind: "rotate" })}
                 />

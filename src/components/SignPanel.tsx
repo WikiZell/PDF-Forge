@@ -75,9 +75,9 @@ export function SignPanel() {
     window.addEventListener("pointerup", onUp);
   };
 
-  const b = "rounded border px-2 py-1 text-sm disabled:opacity-40";
+  const b = "btn btn-sm text-sm disabled:opacity-40";
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-auto border-l p-3 text-sm max-[900px]:w-60" aria-label="Fill and sign">
+    <aside className="flex w-72 shrink-0 flex-col overflow-auto border-l p-4 text-sm max-[900px]:w-60" style={{ background: "var(--surface)" }} aria-label="Fill and sign">
       <h2 className="mb-2 text-base font-semibold">Fill &amp; Sign</h2>
 
       <section aria-labelledby="sigs-h">
@@ -85,7 +85,7 @@ export function SignPanel() {
           <h3 id="sigs-h" className="font-semibold">Signatures</h3>
           <button className={b} onClick={() => setDialog(true)}>New…</button>
         </div>
-        {s.library.length === 0 && <p className="text-neutral-500">No saved signatures yet. Draw, type or import one.</p>}
+        {s.library.length === 0 && <p className="text-[var(--muted)]">No saved signatures yet. Draw, type or import one.</p>}
         <ul className="space-y-2">
           {s.library.map((sig) => (
             <li key={sig.id} className={`rounded border p-1.5 ${s.armed?.kind === "signature" && s.armed.sigId === sig.id ? "ring-2 ring-blue-600" : ""}`}>
@@ -100,8 +100,8 @@ export function SignPanel() {
               </button>
               <div className="mt-1 flex items-center gap-1">
                 <span className="min-w-0 flex-1 truncate" title={sig.name}>{sig.name}</span>
-                <button className="px-1 underline" onClick={() => { const n = window.prompt("Rename signature", sig.name); if (n) void s.rename(sig.id, n); }}>Rename</button>
-                <button className="px-1 text-red-700 underline" onClick={() => { if (window.confirm(`Delete "${sig.name}"?`)) { forgetSigImage(sig.id); void s.remove(sig.id); } }}>Delete</button>
+                <button className="btn btn-sm btn-quiet" onClick={() => { const n = window.prompt("Rename signature", sig.name); if (n) void s.rename(sig.id, n); }}>Rename</button>
+                <button className="btn btn-sm btn-quiet btn-danger" onClick={() => { if (window.confirm(`Delete "${sig.name}"?`)) { forgetSigImage(sig.id); void s.remove(sig.id); } }}>Delete</button>
               </div>
             </li>
           ))}
@@ -114,20 +114,20 @@ export function SignPanel() {
           <button className={b} aria-pressed={s.armed?.kind === "date"} onClick={() => s.setArmed(s.armed?.kind === "date" ? null : { kind: "date" })}>Date</button>
           <button className={b} aria-pressed={s.armed?.kind === "text"} onClick={() => s.setArmed(s.armed?.kind === "text" ? null : { kind: "text" })}>Text</button>
         </div>
-        {s.armed && <p className="mt-1 text-xs text-neutral-500" role="status">Click on the page to place. Esc cancels.</p>}
+        {s.armed && <p className="mt-1 text-xs text-[var(--muted)]" role="status">Click on the page to place. Esc cancels.</p>}
       </section>
 
       {selected?.kind === "text" && (
         <section className="mt-4" aria-labelledby="props-h">
           <h3 id="props-h" className="mb-1 font-semibold">Selected text</h3>
           <label className="block">Text
-            <input className="mt-1 w-full rounded border px-2 py-1 dark:bg-neutral-900" value={selected.text ?? ""}
+            <input className="input mt-1 w-full" value={selected.text ?? ""}
               onFocus={() => { before.current = placements; }}
               onChange={(e) => updateText({ text: e.target.value })}
               onBlur={() => s.endDrag(before.current)} />
           </label>
           <label className="mt-1 block">Size
-            <input type="number" min={4} max={200} className="ml-2 w-16 rounded border px-1 dark:bg-neutral-900" value={selected.fontSize ?? 12}
+            <input type="number" min={4} max={200} className="ml-2 w-16 input" value={selected.fontSize ?? 12}
               onFocus={() => { before.current = placements; }}
               onChange={(e) => updateText({ fontSize: Math.min(200, Math.max(4, Number(e.target.value) || 12)) })}
               onBlur={() => s.endDrag(before.current)} />
@@ -141,18 +141,18 @@ export function SignPanel() {
           <button className={b} disabled={s.history.future.length === 0} onClick={s.redo} aria-keyshortcuts="Control+Y">Redo</button>
           <button className={b} disabled={!s.selectedId} onClick={s.deleteSelected} aria-keyshortcuts="Delete">Delete</button>
         </div>
-        <p className="mt-1 text-xs text-neutral-500">{placements.length} item(s) placed. Arrow keys nudge the selection; Shift+resize frees the aspect ratio.</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">{placements.length} item(s) placed. Arrow keys nudge the selection; Shift+resize frees the aspect ratio.</p>
       </section>
 
       <section className="mt-4">
         <label className="flex items-start gap-2">
           <input type="checkbox" className="mt-1" checked={s.flatten} onChange={(e) => s.setFlatten(e.target.checked)} />
-          <span>Flatten on save<br /><span className="text-xs text-neutral-500">Bakes everything into the page so it can no longer be moved or removed. Off = editable annotations.</span></span>
+          <span>Flatten on save<br /><span className="text-xs text-[var(--muted)]">Bakes everything into the page so it can no longer be moved or removed. Off = editable annotations.</span></span>
         </label>
-        <button className="mt-3 w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-40" disabled={placements.length === 0 || s.busy} onClick={() => save()}>
+        <button className="btn btn-primary mt-3 w-full !min-h-10" disabled={placements.length === 0 || s.busy} onClick={() => save()}>
           Save signed copy…
         </button>
-        <p className="mt-1 text-xs text-neutral-500">The original file is never modified.</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">The original file is never modified.</p>
       </section>
 
       {s.error && <p role="alert" className="mt-3 rounded bg-amber-100 p-2 text-amber-900">{s.error.message}</p>}

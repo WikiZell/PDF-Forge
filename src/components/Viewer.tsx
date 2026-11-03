@@ -87,7 +87,7 @@ export function Viewer() {
       ref={host}
       tabIndex={0}
       aria-label="Document viewer"
-      className="flex-1 overflow-auto bg-neutral-300 p-4 focus-visible:outline-2 dark:bg-neutral-700"
+      className="flex-1 overflow-auto p-6 focus-visible:outline-2" style={{ background: "var(--canvas)" }}
     >
       {sizes.length === doc?.pageCount &&
         shown.map(({ g, i }) => (

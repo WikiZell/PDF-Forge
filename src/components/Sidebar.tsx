@@ -15,14 +15,14 @@ export function Sidebar() {
   const setSidebar = useViewer((s) => s.setSidebar);
   if (!sidebar) return null;
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r" aria-label="Sidebar">
-      <div role="tablist" aria-label="Sidebar panels" className="flex border-b text-sm">
+    <aside className="flex w-64 shrink-0 flex-col border-r" style={{ background: "var(--surface)", borderColor: "var(--border)" }} aria-label="Sidebar">
+      <div role="tablist" aria-label="Sidebar panels" className="flex gap-4 border-b px-3 text-sm" style={{ borderColor: "var(--border)" }}>
         {TABS.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={sidebar === t.id}
-            className={`flex-1 px-2 py-1.5 ${sidebar === t.id ? "border-b-2 border-blue-600 font-semibold" : ""}`}
+            className="tab"
             onClick={() => setSidebar(t.id)}
           >
             {t.label}
@@ -51,12 +51,12 @@ function Thumb({ page }: { page: number }) {
       aria-label={`Go to page ${page + 1}`}
       aria-current={current === page ? "page" : undefined}
       onClick={() => goToPage(page)}
-      className={`mx-auto mb-3 block rounded p-1 ${current === page ? "ring-2 ring-blue-600" : ""}`}
+      className={`mx-auto mb-3 block rounded-lg p-1.5 transition-colors ${current === page ? "ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]" : "hover:bg-[var(--surface-2)]"}`}
     >
-      <div className="bg-white shadow" style={{ width: w, height: s ? Math.round(s.height * scale) : 180 }}>
+      <div className="page-sheet" style={{ width: w, height: s ? Math.round(s.height * scale) : 180 }}>
         {url && <img src={url} alt="" width={w} draggable={false} />}
       </div>
-      <div className="mt-1 text-center text-xs">{page + 1}</div>
+      <div className="mt-1 text-center text-xs" style={{ color: "var(--muted)" }}>{page + 1}</div>
     </button>
   );
 }
@@ -87,13 +87,13 @@ function Outline() {
     };
   }, [doc]);
   if (!items) return <p className="p-3 text-sm">Loading…</p>;
-  if (items.length === 0) return <p className="p-3 text-sm text-neutral-500">This document has no bookmarks.</p>;
+  if (items.length === 0) return <p className="p-3 text-sm text-[var(--muted)]">This document has no bookmarks.</p>;
   return (
     <ul className="p-1 text-sm">
       {items.map((it, i) => (
         <li key={i}>
           <button
-            className="block w-full truncate rounded px-2 py-1 text-left hover:bg-neutral-200 disabled:opacity-50 dark:hover:bg-neutral-700"
+            className="list-btn truncate disabled:opacity-50"
             style={{ paddingLeft: 8 + it.depth * 14 }}
             disabled={it.page === null}
             title={it.title}
@@ -144,16 +144,16 @@ export function SearchPanel() {
           value={search.query}
           onChange={(e) => setSearch({ query: e.target.value })}
           placeholder="Find in document"
-          className="w-full rounded border px-2 py-1 dark:bg-neutral-800"
+          className="input w-full"
         />
         <label className="mt-1 flex items-center gap-1">
           <input type="checkbox" checked={search.matchCase} onChange={(e) => setSearch({ matchCase: e.target.checked })} />
           Match case
         </label>
         <div className="mt-2 flex gap-1">
-          <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-white" disabled={search.running}>Find</button>
-          <button type="button" className="rounded border px-2 py-1" aria-label="Previous match" onClick={() => stepHit(-1)}>↑</button>
-          <button type="button" className="rounded border px-2 py-1" aria-label="Next match" onClick={() => stepHit(1)}>↓</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={search.running}>Find</button>
+          <button type="button" className="btn btn-sm" aria-label="Previous match" onClick={() => stepHit(-1)}>↑</button>
+          <button type="button" className="btn btn-sm" aria-label="Next match" onClick={() => stepHit(1)}>↓</button>
         </div>
       </form>
       <p className="mt-2" aria-live="polite">
@@ -169,7 +169,7 @@ export function SearchPanel() {
         {search.hits.slice(0, 200).map((h, i) => (
           <li key={i}>
             <button
-              className={`w-full rounded px-2 py-0.5 text-left ${i === search.current ? "bg-orange-200 dark:bg-orange-900" : ""}`}
+              className={`list-btn ${i === search.current ? "!bg-[var(--accent-soft)]" : ""}`}
               onClick={() => useViewer.setState((s) => ({ search: { ...s.search, current: i }, page: h.page, jumpSeq: s.jumpSeq + 1 }))}
             >
               Page {h.page + 1}

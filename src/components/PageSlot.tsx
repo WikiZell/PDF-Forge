@@ -60,7 +60,7 @@ export const PageSlot = memo(function PageSlot({ docId, page, width, height, sca
       data-page={page}
       role="img"
       aria-label={`Page ${page + 1}`}
-      className="relative shrink-0 bg-white shadow-lg"
+      className="relative shrink-0 page-sheet"
       style={{ width: w, height: h }}
     >
       {url && <img src={url} alt="" width={w} height={h} draggable={false} className="absolute inset-0 select-none" />}

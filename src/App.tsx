@@ -133,7 +133,7 @@ export function App() {
   }, [openDialog, print]);
 
   return (
-    <div id="app-root" className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+    <div id="app-root" className="flex h-screen flex-col">
       <Toolbar
         onOpen={openDialog}
         onPrint={print}
@@ -147,12 +147,12 @@ export function App() {
       />
 
       {libError && (
-        <div role="alert" className="border-b border-red-300 bg-red-100 px-3 py-2 text-sm text-red-900">{libError}</div>
+        <div role="alert" className="border-b px-4 py-2 text-sm" style={{ background: "var(--danger-soft)", color: "var(--danger)", borderColor: "var(--border)" }}>{libError}</div>
       )}
       {v.error && (
-        <div role="alert" className="flex items-center justify-between border-b border-amber-300 bg-amber-100 px-3 py-2 text-sm text-amber-900">
+        <div role="alert" className="flex items-center justify-between border-b px-4 py-2 text-sm" style={{ background: "color-mix(in srgb, #f59e0b 16%, var(--surface))", borderColor: "var(--border)" }}>
           <span>{v.error.message}</span>
-          <button className="underline" onClick={() => v.setError(null)}>Dismiss</button>
+          <button className="btn btn-sm btn-quiet" onClick={() => v.setError(null)}>Dismiss</button>
         </div>
       )}
 
