@@ -141,3 +141,5 @@ body {
 @font-face { font-family: "PF Great Vibes"; src: url("./assets/fonts/GreatVibes.ttf") format("truetype"); }
 @font-face { font-family: "PF Caveat"; src: url("./assets/fonts/Caveat.ttf") format("truetype"); font-weight: 400 700; }
 @font-face { font-family: "PF Sacramento"; src: url("./assets/fonts/Sacramento.ttf") format("truetype"); }
+
+progress, input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--accent); }

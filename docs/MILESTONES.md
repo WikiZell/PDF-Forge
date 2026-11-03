@@ -104,6 +104,15 @@ Reader now shows **both** the annotated copy (`acrobat-app-signed-annot.png`) an
 image on both pages, the ink stroke and the text box visible; only a taskbar-pin toast sits in the corner.
 Acrobat's comment panel counts them as 5 (annotated) vs 4 (flattened).
 
+**UI redesign (commit 1beddc6, run 41597578899):** new design system (light/dark tokens, icon set, two-tier
+grouped toolbar, refined sidebar/welcome/organizer/dialogs). Evidence: 19 mocked-IPC E2E and 52 unit tests
+pass; the real installed app on Windows passes the same 14 real-app tests (native dialogs, bulk signing,
+DPI layouts, scan metrics), the MSI install/launch/uninstall passes, and the NVDA pass still announces every
+control by name (the earlier zoom-field "invalid entry" announcement is gone). Screenshots on `windows-smoke`
+(`real-sign.png`, `real-bulk-done.png`, `real-viewer.png`). Design-review screenshots can be regenerated with
+`DESIGN_SHOTS=1 npx playwright test e2e/design-shots.spec.ts`. Not formally done: a usability study with
+real users, and a contrast audit beyond the token palette.
+
 **Still not done:** a person using a screen reader; signing the installers (unsigned; SmartScreen will warn -
 needs an Authenticode certificate, the CI hook is in place); OCR for scans (not in the spec); macOS/Linux
 builds (not wired by design).
