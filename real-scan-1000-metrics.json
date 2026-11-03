@@ -1,0 +1,13 @@
+{
+  "fileMB": 138,
+  "memBeforeMB": 68,
+  "openMs": 5585,
+  "firstPageMs": 5591,
+  "jumpToPage500Ms": 391,
+  "fiveJumpsMs": 1419,
+  "memAfterViewMB": 205,
+  "searchMs": 186,
+  "organizerLoadMs": 290,
+  "buildOutputMs": 212,
+  "memAfterOrganizerMB": 478
+}

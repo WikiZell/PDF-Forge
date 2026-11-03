@@ -1,0 +1,55 @@
+0 Window | PDF Forge
+1 Pane | 
+2 Pane | PDF Forge
+3 Pane | 
+3 Pane | PDF Forge - Web content
+4 Pane | 
+5 Pane | 
+5 Pane | 
+6 Pane | 
+7 Document | PDF Forge
+8 Group | 
+9 ToolBar | Viewer controls
+10 Button | Open…
+10 Group | Tools
+11 Button | Merge PDFs…
+11 Button | Bulk sign…
+11 Button | Organize pages
+11 Button | Fill & Sign
+10 Text | signed-annot.pdf
+10 Button | Find
+10 Button | Print…
+10 Button | Settings
+10 Button | Sidebar
+10 Group | Page navigation
+11 Button | Previous page
+11 Text | Page number
+11 Spinner | Page number
+11 Text | / 
+11 Text | 2
+11 Button | Next page
+10 Group | Zoom
+11 Button | Zoom out
+11 Group | 
+12 Text | 238
+12 Text | %
+11 Button | Zoom in
+11 Text | Zoom percent
+11 Spinner | Zoom percent
+10 Group | Fit
+11 Button | Fit width
+11 Button | Fit page
+10 Text | Page layout
+10 ComboBox | Page layout
+9 Group | Sidebar
+10 Tab | Sidebar panels
+11 TabItem | Pages
+11 TabItem | Bookmarks
+11 TabItem | Search
+10 Pane | 
+11 Button | Go to page 1
+11 Button | Go to page 2
+9 Group | Document viewer
+10 Image | Page 1
+10 Image | Page 2
+7 Pane | 

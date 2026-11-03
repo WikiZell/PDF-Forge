@@ -1,0 +1,76 @@
+- toolbar "Viewer controls":
+  - button "Open…"
+  - group "Tools":
+    - button "Merge PDFs…"
+    - button "Bulk sign…"
+    - button "Organize pages"
+    - button "Fill & Sign" [pressed]
+  - text: merged.pdf
+  - button "Find"
+  - button "Print…"
+  - button "Settings"
+  - button "Sidebar" [pressed]
+  - group "Page navigation":
+    - button "Previous page"
+    - text: Page number
+    - spinbutton "Page number": "2"
+    - text: / 5
+    - button "Next page"
+  - group "Zoom":
+    - button "Zoom out"
+    - text: 107%
+    - button "Zoom in"
+    - text: Zoom percent
+    - spinbutton "Zoom percent": "107"
+  - group "Fit":
+    - button "Fit width" [pressed]
+    - button "Fit page"
+  - text: Page layout
+  - combobox "Page layout":
+    - option "Continuous" [selected]
+    - option "Single page"
+    - option "Two pages"
+- complementary "Sidebar":
+  - tablist "Sidebar panels":
+    - tab "Pages" [selected]
+    - tab "Bookmarks"
+    - tab "Search"
+  - tabpanel:
+    - button "Go to page 1": "1"
+    - button "Go to page 2": "2"
+    - button "Go to page 3": "3"
+    - button "Go to page 4": "4"
+    - button "Go to page 5": "5"
+- img "Page 1"
+- img "Page 2":
+  - button "Signature"
+  - 'button "Text: 11/03/2026" [pressed]': 11/03/2026
+  - text: Alpha-P0
+- img "Page 3": Alpha-P1
+- img "Page 4": Alpha-P2
+- img "Page 5"
+- complementary "Fill and sign":
+  - heading "Fill & Sign" [level=2]
+  - region "Signatures":
+    - heading "Signatures" [level=3]
+    - button "New…"
+    - paragraph: No saved signatures yet. Draw, type or import one.
+    - list
+  - region "Fields":
+    - heading "Fields" [level=3]
+    - button "Date"
+    - button "Text"
+  - region "Selected text":
+    - heading "Selected text" [level=3]
+    - text: Text
+    - textbox "Text": 11/03/2026
+    - text: Size
+    - spinbutton "Size": "12"
+  - button "Undo"
+  - button "Redo" [disabled]
+  - button "Delete"
+  - paragraph: 2 item(s) placed. Arrow keys nudge the selection; Shift+resize frees the aspect ratio.
+  - checkbox "Flatten on save Bakes everything into the page so it can no longer be moved or removed. Off = editable annotations."
+  - text: Flatten on save Bakes everything into the page so it can no longer be moved or removed. Off = editable annotations.
+  - button "Save signed copy…"
+  - paragraph: The original file is never modified.
